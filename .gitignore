@@ -1,0 +1,60 @@
+# ======================
+# LOGS (ignorar tudo)
+# ======================
+logs/
+
+# ======================
+# PASTA mind7
+# ======================
+
+# Permitir a pasta
+!mind7/
+
+# Ignorar subpastas específicas
+mind7/entrada/
+mind7/saida/
+mind7/perfil_chrome/
+
+# Permitir arquivos específicos
+!mind7/abrir_chrome_mind7.bat
+!mind7/consultar_mind7.py
+
+
+# ======================
+# PASTA tracers
+# ======================
+
+# Permitir a pasta
+!tracers/
+
+# Ignorar subpastas específicas
+tracers/platform-tools/
+tracers/saida/
+tracers/Leia-me/
+tracers/windows-dump/
+
+# Permitir arquivos específicos
+!tracers/extrair_tracers.py
+!tracers/1_EXTRAIR_PLACAS.bat
+
+
+# ======================
+# RAIZ DO PROJETO
+# ======================
+
+# Garantir que esses arquivos subam
+!abri_interface.bat
+!app.py
+
+
+# ======================
+# GERAL (opcional, mas recomendado)
+# ======================
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store
+Thumbs.db
