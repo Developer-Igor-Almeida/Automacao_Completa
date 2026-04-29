@@ -23,20 +23,26 @@ TEMPO_ENTRE_CONSULTAS = 8
 PAUSA_A_CADA_CONSULTAS = 5
 TEMPO_PAUSA_LONGA = 60
 
+MAX_TENTATIVAS_CAPTCHA = 5
+TEMPO_ESPERA_CAPTCHA = 30
+
 SAIDA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def limpar_placa(placa):
     return str(placa or "").strip().upper().replace(" ", "").replace("-", "")
 
+
 def apenas_numeros(valor):
     return re.sub(r"\D", "", str(valor))
+
 
 def formatar_cpf(cpf):
     cpf = apenas_numeros(cpf)
     if len(cpf) == 11:
         return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
     return cpf
+
 
 def formatar_cnpj(cnpj):
     cnpj = apenas_numeros(cnpj)
@@ -85,17 +91,14 @@ def extrair_documento_do_texto(texto):
 
     bloco = bloco_prop.group(1)
 
-    # CPF com máscara
     match = re.search(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", bloco)
     if match:
         return formatar_cpf(match.group(0))
 
-    # CNPJ com máscara
     match = re.search(r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b", bloco)
     if match:
         return formatar_cnpj(match.group(0))
 
-    # CPF ou CNPJ sem máscara
     match = re.search(r"\b\d{11,14}\b", bloco)
     if match:
         numero = apenas_numeros(match.group(0))
@@ -105,31 +108,6 @@ def extrair_documento_do_texto(texto):
 
         if len(numero) == 14:
             return formatar_cnpj(numero)
-
-    return ""
-
-
-def esperar_cpf_ou_fim(pagina, timeout_segundos=8):
-    inicio = time.time()
-
-    while time.time() - inicio < timeout_segundos:
-        texto = pagina.locator("body").inner_text(timeout=5000)
-
-        if (
-            "CAPTCHA" in texto.upper()
-            or "não foi possível validar sua consulta" in texto.lower()
-            or "nao foi possivel validar sua consulta" in texto.lower()
-        ):
-            return "CAPTCHA"
-
-        documento = extrair_documento_do_texto(texto)
-        if documento:
-            return documento
-
-        if "PROPRIETÁRIO" in texto.upper():
-            return ""
-
-        time.sleep(0.5)
 
     return ""
 
@@ -179,6 +157,7 @@ def consultar_placa(pagina, placa):
         time.sleep(0.5)
 
     return ""
+
 
 def tipo_documento(valor):
     numeros = apenas_numeros(valor)
@@ -274,41 +253,69 @@ def salvar_documentos_filtrados(ws, col_cpf):
         wb_doc, _ = workbooks[chave]
         wb_doc.save(config["caminho"])
 
-def salvar_excel_somente_cpfs(ws, col_cpf, caminho):
-    from openpyxl import Workbook
 
-    wb_cpfs = Workbook()
-    ws_cpfs = wb_cpfs.active
-    ws_cpfs.title = "CPFs"
+def pausar_preventivamente(consultas_realizadas):
+    if consultas_realizadas % PAUSA_A_CADA_CONSULTAS == 0:
+        print(f"Pausa preventiva de {TEMPO_PAUSA_LONGA}s para reduzir CAPTCHA...")
+        time.sleep(TEMPO_PAUSA_LONGA)
+    else:
+        time.sleep(TEMPO_ENTRE_CONSULTAS)
 
-    ws_cpfs.append(["CPF"])
 
-    cpfs_vistos = set()
+def retentar_placas_captcha(pagina, ws, col_placa, col_cpf, placas_captcha):
+    tentativa = 1
 
-    for row in range(2, ws.max_row + 1):
-        cpf = ws.cell(row=row, column=col_cpf).value
+    while placas_captcha and tentativa <= MAX_TENTATIVAS_CAPTCHA:
+        print(f"\nTentativa {tentativa}/{MAX_TENTATIVAS_CAPTCHA} para placas com CAPTCHA.")
+        print(f"Placas pendentes: {len(placas_captcha)}")
+        print(f"Aguardando {TEMPO_ESPERA_CAPTCHA}s antes de tentar novamente...")
+        time.sleep(TEMPO_ESPERA_CAPTCHA)
 
-        if not cpf:
-            continue
+        pendentes = placas_captcha
+        placas_captcha = []
 
-        cpf = str(cpf).strip()
+        for row in pendentes:
+            placa_original = ws.cell(row=row, column=col_placa).value
+            placa = limpar_placa(placa_original)
 
-        if cpf.lower() in {
-            "não encontrado",
-            "nao encontrado",
-            "erro",
-            "captcha"
-        }:
-            continue
+            if not placa:
+                continue
 
-        chave = re.sub(r"\D", "", cpf)
+            print(f"Retentando placa: {placa}")
 
-        if len(chave) == 11 and chave not in cpfs_vistos:
-            cpfs_vistos.add(chave)
-            ws_cpfs.append([formatar_cpf(cpf)])
+            try:
+                pagina.goto(URL_CONSULTA, wait_until="domcontentloaded")
+                time.sleep(5)
 
-    ws_cpfs.column_dimensions["A"].width = 20
-    wb_cpfs.save(caminho)
+                documento = consultar_placa(pagina, placa)
+
+                if documento == "CAPTCHA":
+                    print(f"CAPTCHA novamente na placa {placa}. Vai tentar novamente depois.")
+                    ws.cell(row=row, column=col_cpf).value = ""
+                    placas_captcha.append(row)
+
+                elif documento:
+                    print(f"CPF/CNPJ encontrado para {placa}: {documento}")
+                    ws.cell(row=row, column=col_cpf).value = documento
+
+                else:
+                    print(f"CPF/CNPJ não encontrado para {placa}.")
+                    ws.cell(row=row, column=col_cpf).value = "Não encontrado"
+
+                time.sleep(TEMPO_ENTRE_CONSULTAS)
+
+            except Exception as e:
+                print(f"Erro ao retentar {placa}: {e}")
+                ws.cell(row=row, column=col_cpf).value = ""
+                placas_captcha.append(row)
+
+        tentativa += 1
+
+    if placas_captcha:
+        print(f"\nAinda restaram {len(placas_captcha)} placas com CAPTCHA após todas as tentativas.")
+        print("Elas ficarão em branco para próxima execução.")
+
+    return placas_captcha
 
 
 def main():
@@ -328,6 +335,7 @@ def main():
     col_cpf = garantir_coluna(ws, COLUNA_CPF)
 
     consultas_realizadas = 0
+    placas_captcha = []
 
     with sync_playwright() as p:
         navegador = p.chromium.connect_over_cdp("http://localhost:9222")
@@ -346,35 +354,32 @@ def main():
                 continue
 
             cpf_atual = ws.cell(row=row, column=col_cpf).value
-            if cpf_atual and str(cpf_atual).strip().upper() != "CAPTCHA":
-                print(f"Pulando {placa}: CPF já preenchido.")
+
+            if cpf_atual:
+                print(f"Pulando {placa}: já preenchido.")
                 continue
 
             try:
-                cpf = consultar_placa(pagina, placa)
+                documento = consultar_placa(pagina, placa)
 
-                if cpf == "CAPTCHA":
-                    print(f"CAPTCHA encontrado na placa {placa}. Marcando e seguindo para a próxima.")
-                    ws.cell(row=row, column=col_cpf).value = "CAPTCHA"
+                if documento == "CAPTCHA":
+                    print(f"CAPTCHA encontrado na placa {placa}. Guardando para tentar novamente depois.")
+                    ws.cell(row=row, column=col_cpf).value = ""
+                    placas_captcha.append(row)
 
-                elif cpf:
-                    print(f"CPF encontrado para {placa}: {cpf}")
-                    ws.cell(row=row, column=col_cpf).value = cpf
+                elif documento:
+                    print(f"CPF/CNPJ encontrado para {placa}: {documento}")
+                    ws.cell(row=row, column=col_cpf).value = documento
 
                 else:
-                    print(f"CPF não encontrado para {placa}.")
+                    print(f"CPF/CNPJ não encontrado para {placa}.")
                     ws.cell(row=row, column=col_cpf).value = "Não encontrado"
 
                 wb.save(EXCEL_SAIDA)
                 salvar_documentos_filtrados(ws, col_cpf)
 
                 consultas_realizadas += 1
-
-                if consultas_realizadas % PAUSA_A_CADA_CONSULTAS == 0:
-                    print(f"Pausa preventiva de {TEMPO_PAUSA_LONGA}s para reduzir CAPTCHA...")
-                    time.sleep(TEMPO_PAUSA_LONGA)
-                else:
-                    time.sleep(TEMPO_ENTRE_CONSULTAS)
+                pausar_preventivamente(consultas_realizadas)
 
             except Exception as e:
                 print(f"Erro ao consultar {placa}: {e}")
@@ -383,10 +388,19 @@ def main():
                 wb.save(EXCEL_SAIDA)
                 salvar_documentos_filtrados(ws, col_cpf)
 
+        placas_captcha = retentar_placas_captcha(
+            pagina,
+            ws,
+            col_placa,
+            col_cpf,
+            placas_captcha
+        )
+
     wb.save(EXCEL_SAIDA)
     salvar_documentos_filtrados(ws, col_cpf)
 
     print("Finalizado.")
+    print(f"Resultado completo: {EXCEL_SAIDA}")
     print(f"Somente CPFs: {EXCEL_SOMENTE_CPFS}")
     print(f"CPFs e CNPJs: {EXCEL_CPFS_CNPJS}")
     print(f"Somente CNPJs: {EXCEL_SOMENTE_CNPJS}")
