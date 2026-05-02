@@ -24,6 +24,7 @@ PAUSA_A_CADA_CONSULTAS = 5
 TEMPO_PAUSA_LONGA = 60
 
 MAX_TENTATIVAS_CAPTCHA = 5
+MAX_TENTATIVAS_EXTRAS_COM_SUCESSO = 10
 TEMPO_ESPERA_CAPTCHA = 30
 
 SAIDA_DIR.mkdir(parents=True, exist_ok=True)
@@ -264,15 +265,20 @@ def pausar_preventivamente(consultas_realizadas):
 
 def retentar_placas_captcha(pagina, ws, col_placa, col_cpf, placas_captcha):
     tentativa = 1
+    tentativas_extras = 0
 
-    while placas_captcha and tentativa <= MAX_TENTATIVAS_CAPTCHA:
-        print(f"\nTentativa {tentativa}/{MAX_TENTATIVAS_CAPTCHA} para placas com CAPTCHA.")
+    while placas_captcha:
+        if tentativa > MAX_TENTATIVAS_CAPTCHA and tentativas_extras >= MAX_TENTATIVAS_EXTRAS_COM_SUCESSO:
+            break
+
+        print(f"\nTentativa {tentativa} para placas com CAPTCHA.")
         print(f"Placas pendentes: {len(placas_captcha)}")
         print(f"Aguardando {TEMPO_ESPERA_CAPTCHA}s antes de tentar novamente...")
         time.sleep(TEMPO_ESPERA_CAPTCHA)
 
         pendentes = placas_captcha
         placas_captcha = []
+        resolvidas_nesta_rodada = 0
 
         for row in pendentes:
             placa_original = ws.cell(row=row, column=col_placa).value
@@ -297,10 +303,12 @@ def retentar_placas_captcha(pagina, ws, col_placa, col_cpf, placas_captcha):
                 elif documento:
                     print(f"CPF/CNPJ encontrado para {placa}: {documento}")
                     ws.cell(row=row, column=col_cpf).value = documento
+                    resolvidas_nesta_rodada += 1
 
                 else:
                     print(f"CPF/CNPJ não encontrado para {placa}.")
                     ws.cell(row=row, column=col_cpf).value = "Não encontrado"
+                    resolvidas_nesta_rodada += 1
 
                 time.sleep(TEMPO_ENTRE_CONSULTAS)
 
@@ -309,10 +317,20 @@ def retentar_placas_captcha(pagina, ws, col_placa, col_cpf, placas_captcha):
                 ws.cell(row=row, column=col_cpf).value = ""
                 placas_captcha.append(row)
 
+        print(f"Resolvidas nesta rodada: {resolvidas_nesta_rodada}")
+
+        if tentativa >= MAX_TENTATIVAS_CAPTCHA:
+            if resolvidas_nesta_rodada > 0:
+                tentativas_extras += 1
+                print("Houve progresso. Permitindo tentativa extra.")
+            else:
+                print("Nenhuma placa foi resolvida nesta rodada. Encerrando retentativas.")
+                break
+
         tentativa += 1
 
     if placas_captcha:
-        print(f"\nAinda restaram {len(placas_captcha)} placas com CAPTCHA após todas as tentativas.")
+        print(f"\nAinda restaram {len(placas_captcha)} placas com CAPTCHA.")
         print("Elas ficarão em branco para próxima execução.")
 
     return placas_captcha
