@@ -60,23 +60,20 @@ if "etapa" not in st.session_state:
 if "log_atual" not in st.session_state:
     st.session_state.log_atual = None
 
-if "etapa_tracers_ok" not in st.session_state:
-    st.session_state.etapa_tracers_ok = False
-
-if "etapa_envio_ok" not in st.session_state:
-    st.session_state.etapa_envio_ok = False
-
-if "etapa_chrome_ok" not in st.session_state:
-    st.session_state.etapa_chrome_ok = False
-
-if "etapa_consulta_ok" not in st.session_state:
-    st.session_state.etapa_consulta_ok = False
-
-if "tracers_iniciado" not in st.session_state:
-    st.session_state.tracers_iniciado = False
-
-if "consulta_iniciada" not in st.session_state:
-    st.session_state.consulta_iniciada = False
+for chave in [
+    "etapa_tracers_ok",
+    "etapa_envio_ok",
+    "etapa_chrome_ok",
+    "etapa_consulta_ok",
+    "etapa_tracers_erro",
+    "etapa_envio_erro",
+    "etapa_chrome_erro",
+    "etapa_consulta_erro",
+    "tracers_iniciado",
+    "consulta_iniciada",
+]:
+    if chave not in st.session_state:
+        st.session_state[chave] = False
 
 
 def processo_rodando():
@@ -84,23 +81,35 @@ def processo_rodando():
     return p is not None and p.poll() is None
 
 
+def icone_status(ok, erro):
+    if ok:
+        return " ✅"
+    if erro:
+        return " ❌"
+    return ""
+
+
 def detectar_finalizacao_processo():
     p = st.session_state.processo
 
     if p is not None and p.poll() is not None and st.session_state.etapa:
-        if (
-            st.session_state.etapa == "Extração de placas do Tracers"
-            and st.session_state.tracers_iniciado
-            and EXCEL_TRACERS.exists()
-        ):
-            st.session_state.etapa_tracers_ok = True
+        codigo = p.returncode
 
-        elif (
-            st.session_state.etapa == "Consulta de CPFs/CNPJs no Mind7"
-            and st.session_state.consulta_iniciada
-            and RESULTADO.exists()
-        ):
-            st.session_state.etapa_consulta_ok = True
+        if st.session_state.etapa == "Extração de placas do Tracers":
+            if codigo == 0 and st.session_state.tracers_iniciado and EXCEL_TRACERS.exists():
+                st.session_state.etapa_tracers_ok = True
+                st.session_state.etapa_tracers_erro = False
+            else:
+                st.session_state.etapa_tracers_ok = False
+                st.session_state.etapa_tracers_erro = True
+
+        elif st.session_state.etapa == "Consulta de CPFs/CNPJs no Mind7":
+            if codigo == 0 and st.session_state.consulta_iniciada and RESULTADO.exists():
+                st.session_state.etapa_consulta_ok = True
+                st.session_state.etapa_consulta_erro = False
+            else:
+                st.session_state.etapa_consulta_ok = False
+                st.session_state.etapa_consulta_erro = True
 
         st.session_state.processo = None
         st.session_state.etapa = ""
@@ -145,6 +154,12 @@ def parar_processo():
             processo.terminate()
         except Exception:
             p.terminate()
+
+    if st.session_state.etapa == "Extração de placas do Tracers":
+        st.session_state.etapa_tracers_erro = True
+
+    if st.session_state.etapa == "Consulta de CPFs/CNPJs no Mind7":
+        st.session_state.etapa_consulta_erro = True
 
     st.session_state.processo = None
     st.session_state.etapa = ""
@@ -277,12 +292,17 @@ with col_esq:
     if not (TRACERS / "extrair_tracers.py").exists():
         st.error(f"Arquivo extrair_tracers.py não encontrado em:\n{TRACERS}")
     else:
-        texto_botao_tracers = "▶️ Iniciar extração de placas"
-        if st.session_state.etapa_tracers_ok:
-            texto_botao_tracers += " ✅"
+        texto_botao_tracers = (
+            "▶️ Iniciar extração de placas"
+            + icone_status(
+                st.session_state.etapa_tracers_ok,
+                st.session_state.etapa_tracers_erro
+            )
+        )
 
         if st.button(texto_botao_tracers, disabled=processo_rodando()):
             st.session_state.etapa_tracers_ok = False
+            st.session_state.etapa_tracers_erro = False
             st.session_state.tracers_iniciado = True
 
             iniciar_processo(
@@ -295,16 +315,26 @@ with col_esq:
 
     st.subheader("2. Enviar Excel para Mind7")
 
-    texto_botao_envio = "📤 Copiar arquivo para Mind7"
-    if st.session_state.etapa_envio_ok:
-        texto_botao_envio += " ✅"
+    texto_botao_envio = (
+        "📤 Copiar arquivo para Mind7"
+        + icone_status(
+            st.session_state.etapa_envio_ok,
+            st.session_state.etapa_envio_erro
+        )
+    )
 
     if EXCEL_TRACERS.exists():
         if st.button(texto_botao_envio, disabled=processo_rodando()):
-            shutil.copy2(EXCEL_TRACERS, EXCEL_MIND7)
-            st.session_state.etapa_envio_ok = True
-            st.success("Arquivo copiado para entrada do Mind7.")
-            st.rerun()
+            try:
+                shutil.copy2(EXCEL_TRACERS, EXCEL_MIND7)
+                st.session_state.etapa_envio_ok = True
+                st.session_state.etapa_envio_erro = False
+                st.success("Arquivo copiado para entrada do Mind7.")
+                st.rerun()
+            except Exception as e:
+                st.session_state.etapa_envio_ok = False
+                st.session_state.etapa_envio_erro = True
+                st.error(f"Erro ao copiar arquivo: {e}")
     else:
         st.info("Execute a extração de placas primeiro.")
 
@@ -313,9 +343,13 @@ with col_dir:
 
     chrome_bat = MIND7 / "abrir_chrome_mind7.bat"
 
-    texto_botao_chrome = "🌐 Abrir Chrome para login"
-    if st.session_state.etapa_chrome_ok:
-        texto_botao_chrome += " ✅"
+    texto_botao_chrome = (
+        "🌐 Abrir Chrome para login"
+        + icone_status(
+            st.session_state.etapa_chrome_ok,
+            st.session_state.etapa_chrome_erro
+        )
+    )
 
     if not chrome_bat.exists():
         st.error(f"Arquivo abrir_chrome_mind7.bat não encontrado em:\n{chrome_bat}")
@@ -328,22 +362,30 @@ with col_dir:
                     shell=False
                 )
                 st.session_state.etapa_chrome_ok = True
+                st.session_state.etapa_chrome_erro = False
                 st.success("Chrome aberto. Faça login no Mind7.")
                 st.rerun()
             except Exception as e:
+                st.session_state.etapa_chrome_ok = False
+                st.session_state.etapa_chrome_erro = True
                 st.error(f"Erro ao abrir Chrome: {e}")
 
     st.subheader("4. Buscar CPFs/CNPJs")
 
-    texto_botao_consulta = "🔎 Iniciar consulta no Mind7"
-    if st.session_state.etapa_consulta_ok:
-        texto_botao_consulta += " ✅"
+    texto_botao_consulta = (
+        "🔎 Iniciar consulta no Mind7"
+        + icone_status(
+            st.session_state.etapa_consulta_ok,
+            st.session_state.etapa_consulta_erro
+        )
+    )
 
     if not (MIND7 / "consultar_mind7.py").exists():
         st.error(f"Arquivo consultar_mind7.py não encontrado em:\n{MIND7}")
     elif EXCEL_MIND7.exists():
         if st.button(texto_botao_consulta, disabled=processo_rodando()):
             st.session_state.etapa_consulta_ok = False
+            st.session_state.etapa_consulta_erro = False
             st.session_state.consulta_iniciada = True
 
             iniciar_processo(
