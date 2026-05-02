@@ -4,7 +4,10 @@ import shutil
 import psutil
 import re
 import os
+import csv
+from io import StringIO
 from pathlib import Path
+from openpyxl import load_workbook
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(
@@ -15,8 +18,8 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).parent
 
-TRACERS = BASE_DIR / "tracers" 
-MIND7 = BASE_DIR / "mind7" 
+TRACERS = BASE_DIR / "tracers"
+MIND7 = BASE_DIR / "mind7"
 
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -44,6 +47,10 @@ if not MIND7.exists():
 (MIND7 / "entrada").mkdir(exist_ok=True)
 (MIND7 / "saida").mkdir(exist_ok=True)
 
+# =========================
+# SESSION STATE
+# =========================
+
 if "processo" not in st.session_state:
     st.session_state.processo = None
 
@@ -53,10 +60,50 @@ if "etapa" not in st.session_state:
 if "log_atual" not in st.session_state:
     st.session_state.log_atual = None
 
+if "etapa_tracers_ok" not in st.session_state:
+    st.session_state.etapa_tracers_ok = False
+
+if "etapa_envio_ok" not in st.session_state:
+    st.session_state.etapa_envio_ok = False
+
+if "etapa_chrome_ok" not in st.session_state:
+    st.session_state.etapa_chrome_ok = False
+
+if "etapa_consulta_ok" not in st.session_state:
+    st.session_state.etapa_consulta_ok = False
+
+if "tracers_iniciado" not in st.session_state:
+    st.session_state.tracers_iniciado = False
+
+if "consulta_iniciada" not in st.session_state:
+    st.session_state.consulta_iniciada = False
+
 
 def processo_rodando():
     p = st.session_state.processo
     return p is not None and p.poll() is None
+
+
+def detectar_finalizacao_processo():
+    p = st.session_state.processo
+
+    if p is not None and p.poll() is not None and st.session_state.etapa:
+        if (
+            st.session_state.etapa == "Extração de placas do Tracers"
+            and st.session_state.tracers_iniciado
+            and EXCEL_TRACERS.exists()
+        ):
+            st.session_state.etapa_tracers_ok = True
+
+        elif (
+            st.session_state.etapa == "Consulta de CPFs/CNPJs no Mind7"
+            and st.session_state.consulta_iniciada
+            and RESULTADO.exists()
+        ):
+            st.session_state.etapa_consulta_ok = True
+
+        st.session_state.processo = None
+        st.session_state.etapa = ""
 
 
 def iniciar_processo(cmd, pasta, log_path, etapa):
@@ -110,6 +157,32 @@ def ler_log(log_path):
     return Path(log_path).read_text(encoding="utf-8", errors="ignore")
 
 
+def limpar_logs():
+    for log_file in [LOG_TRACERS, LOG_MIND7]:
+        try:
+            log_file.write_text("", encoding="utf-8")
+        except Exception:
+            pass
+
+    st.session_state.log_atual = None
+
+
+def converter_xlsx_para_csv(caminho_xlsx):
+    wb = load_workbook(caminho_xlsx)
+    ws = wb.active
+
+    output = StringIO()
+    writer = csv.writer(output, delimiter=";")
+
+    for row in ws.iter_rows(values_only=True):
+        writer.writerow([
+            "" if valor is None else valor
+            for valor in row
+        ])
+
+    return output.getvalue().encode("utf-8-sig")
+
+
 def calcular_progresso(log_texto):
     if not log_texto:
         return 0
@@ -135,6 +208,8 @@ def calcular_progresso(log_texto):
     return 5
 
 
+detectar_finalizacao_processo()
+
 if processo_rodando():
     st_autorefresh(interval=1500, key="refresh_app")
 
@@ -158,6 +233,7 @@ st.markdown(
     '<div class="big-title">🚗 Automação Completa Tracers + Mind7</div>',
     unsafe_allow_html=True
 )
+
 st.markdown(
     '<div class="subtitle">Fluxo automatizado: Tracers → Excel → Mind7 → CPF/CNPJ → Resultado Final</div>',
     unsafe_allow_html=True
@@ -201,7 +277,14 @@ with col_esq:
     if not (TRACERS / "extrair_tracers.py").exists():
         st.error(f"Arquivo extrair_tracers.py não encontrado em:\n{TRACERS}")
     else:
-        if st.button("▶️ Iniciar extração de placas", disabled=processo_rodando()):
+        texto_botao_tracers = "▶️ Iniciar extração de placas"
+        if st.session_state.etapa_tracers_ok:
+            texto_botao_tracers += " ✅"
+
+        if st.button(texto_botao_tracers, disabled=processo_rodando()):
+            st.session_state.etapa_tracers_ok = False
+            st.session_state.tracers_iniciado = True
+
             iniciar_processo(
                 ["python", "-u", "extrair_tracers.py"],
                 TRACERS,
@@ -212,10 +295,16 @@ with col_esq:
 
     st.subheader("2. Enviar Excel para Mind7")
 
+    texto_botao_envio = "📤 Copiar arquivo para Mind7"
+    if st.session_state.etapa_envio_ok:
+        texto_botao_envio += " ✅"
+
     if EXCEL_TRACERS.exists():
-        if st.button("📤 Copiar arquivo para Mind7", disabled=processo_rodando()):
+        if st.button(texto_botao_envio, disabled=processo_rodando()):
             shutil.copy2(EXCEL_TRACERS, EXCEL_MIND7)
+            st.session_state.etapa_envio_ok = True
             st.success("Arquivo copiado para entrada do Mind7.")
+            st.rerun()
     else:
         st.info("Execute a extração de placas primeiro.")
 
@@ -224,26 +313,39 @@ with col_dir:
 
     chrome_bat = MIND7 / "abrir_chrome_mind7.bat"
 
+    texto_botao_chrome = "🌐 Abrir Chrome para login"
+    if st.session_state.etapa_chrome_ok:
+        texto_botao_chrome += " ✅"
+
     if not chrome_bat.exists():
         st.error(f"Arquivo abrir_chrome_mind7.bat não encontrado em:\n{chrome_bat}")
     else:
-        if st.button("🌐 Abrir Chrome para login", disabled=processo_rodando()):
+        if st.button(texto_botao_chrome, disabled=processo_rodando()):
             try:
                 subprocess.Popen(
                     ["cmd", "/c", str(chrome_bat)],
                     cwd=str(MIND7),
                     shell=False
                 )
+                st.session_state.etapa_chrome_ok = True
                 st.success("Chrome aberto. Faça login no Mind7.")
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro ao abrir Chrome: {e}")
 
     st.subheader("4. Buscar CPFs/CNPJs")
 
+    texto_botao_consulta = "🔎 Iniciar consulta no Mind7"
+    if st.session_state.etapa_consulta_ok:
+        texto_botao_consulta += " ✅"
+
     if not (MIND7 / "consultar_mind7.py").exists():
         st.error(f"Arquivo consultar_mind7.py não encontrado em:\n{MIND7}")
     elif EXCEL_MIND7.exists():
-        if st.button("🔎 Iniciar consulta no Mind7", disabled=processo_rodando()):
+        if st.button(texto_botao_consulta, disabled=processo_rodando()):
+            st.session_state.etapa_consulta_ok = False
+            st.session_state.consulta_iniciada = True
+
             iniciar_processo(
                 ["python", "-u", "consultar_mind7.py"],
                 MIND7,
@@ -266,7 +368,21 @@ st.write(f"Progresso estimado: **{progresso}%**")
 
 st.subheader("📜 Logs organizados")
 
+col_log1, col_log2, col_log3 = st.columns([1, 1, 4])
+
+with col_log1:
+    if st.button("🧹 Limpar logs", disabled=processo_rodando()):
+        limpar_logs()
+        st.success("Logs limpos com sucesso!")
+        st.rerun()
+
+with col_log2:
+    if st.button("🔄 Atualizar logs"):
+        st.rerun()
+
 with st.expander("Ver logs da execução", expanded=True):
+    log_texto = ler_log(st.session_state.log_atual)
+
     if log_texto:
         st.code(log_texto[-8000:])
     else:
@@ -274,50 +390,42 @@ with st.expander("Ver logs da execução", expanded=True):
 
 st.divider()
 
-st.subheader("📥 Resultados")
+st.subheader("📥 Baixar arquivo")
 
-col_down1, col_down2, col_down3, col_down4 = st.columns(4)
+arquivos_disponiveis = {
+    "Resultado completo - Excel": RESULTADO,
+    "Somente CPFs - Excel": CPFS,
+    "CPFs + CNPJs - Excel": CPFS_CNPJS,
+    "Somente CNPJs - Excel": CNPJS,
+    "Resultado completo - CSV": RESULTADO,
+    "Somente CPFs - CSV": CPFS,
+    "CPFs + CNPJs - CSV": CPFS_CNPJS,
+    "Somente CNPJs - CSV": CNPJS,
+}
 
-with col_down1:
-    if RESULTADO.exists():
-        with open(RESULTADO, "rb") as file:
-            st.download_button(
-                "📥 Resultado completo",
-                file,
-                file_name="veiculos_tracers_com_cpf.xlsx"
-            )
+opcao_download = st.selectbox(
+    "Escolha o arquivo para baixar:",
+    list(arquivos_disponiveis.keys())
+)
+
+arquivo_escolhido = arquivos_disponiveis[opcao_download]
+
+if not arquivo_escolhido.exists():
+    st.info("Esse arquivo ainda não foi gerado.")
+else:
+    if "CSV" in opcao_download:
+        dados = converter_xlsx_para_csv(arquivo_escolhido)
+        nome_arquivo = arquivo_escolhido.stem + ".csv"
+        mime = "text/csv"
     else:
-        st.info("Resultado completo ainda não gerado.")
+        dados = arquivo_escolhido.read_bytes()
+        nome_arquivo = arquivo_escolhido.name
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-with col_down2:
-    if CPFS.exists():
-        with open(CPFS, "rb") as file:
-            st.download_button(
-                "📥 Somente CPFs",
-                file,
-                file_name="somente_cpfs.xlsx"
-            )
-    else:
-        st.info("CPFs ainda não gerado.")
-
-with col_down3:
-    if CPFS_CNPJS.exists():
-        with open(CPFS_CNPJS, "rb") as file:
-            st.download_button(
-                "📥 CPFs + CNPJs",
-                file,
-                file_name="cpfs_e_cnpjs.xlsx"
-            )
-    else:
-        st.info("CPFs + CNPJs ainda não gerado.")
-
-with col_down4:
-    if CNPJS.exists():
-        with open(CNPJS, "rb") as file:
-            st.download_button(
-                "📥 Somente CNPJs",
-                file,
-                file_name="somente_cnpjs.xlsx"
-            )
-    else:
-        st.info("CNPJs ainda não gerado.")
+    st.download_button(
+        "📥 Baixar arquivo selecionado",
+        data=dados,
+        file_name=nome_arquivo,
+        mime=mime,
+        type="primary"
+    )
