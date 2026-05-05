@@ -12,45 +12,6 @@ from streamlit_autorefresh import st_autorefresh
 import threading
 import time
 
-MONITOR_INICIADO = False
-
-
-def monitorar_conexao():
-    time.sleep(20)
-
-    while True:
-        time.sleep(10)
-
-        try:
-            conexoes = psutil.net_connections(kind="inet")
-
-            conexoes_ativas = [
-                c for c in conexoes
-                if c.laddr
-                and c.laddr.port == 8501
-                and c.status == psutil.CONN_ESTABLISHED
-            ]
-
-            if len(conexoes_ativas) == 0:
-                processo = psutil.Process(os.getpid())
-
-                for filho in processo.children(recursive=True):
-                    try:
-                        filho.terminate()
-                    except Exception:
-                        pass
-
-                processo.terminate()
-                break
-
-        except Exception:
-            pass
-
-
-if not MONITOR_INICIADO:
-    threading.Thread(target=monitorar_conexao, daemon=True).start()
-    MONITOR_INICIADO = True
-
 st.set_page_config(
     page_title="Automação Tracers + Mind7",
     page_icon="🚗",
@@ -101,6 +62,9 @@ if "etapa" not in st.session_state:
 if "log_atual" not in st.session_state:
     st.session_state.log_atual = None
 
+if "monitor_iniciado" not in st.session_state:
+    st.session_state.monitor_iniciado = False
+
 for chave in [
     "etapa_tracers_ok",
     "etapa_envio_ok",
@@ -115,6 +79,43 @@ for chave in [
 ]:
     if chave not in st.session_state:
         st.session_state[chave] = False
+
+
+def monitorar_conexao():
+    time.sleep(20)
+
+    while True:
+        time.sleep(10)
+
+        try:
+            conexoes = psutil.net_connections(kind="inet")
+
+            conexoes_ativas = [
+                c for c in conexoes
+                if c.laddr
+                and c.laddr.port == 8501
+                and c.status == psutil.CONN_ESTABLISHED
+            ]
+
+            if len(conexoes_ativas) == 0:
+                processo = psutil.Process(os.getpid())
+
+                for filho in processo.children(recursive=True):
+                    try:
+                        filho.terminate()
+                    except Exception:
+                        pass
+
+                processo.terminate()
+                break
+
+        except Exception:
+            pass
+
+
+if not st.session_state.monitor_iniciado:
+    threading.Thread(target=monitorar_conexao, daemon=True).start()
+    st.session_state.monitor_iniciado = True
 
 
 def processo_rodando():
@@ -264,6 +265,15 @@ def calcular_progresso(log_texto):
     return 5
 
 
+def mostrar_progresso_etapa(nome_etapa):
+    if processo_rodando() and st.session_state.etapa == nome_etapa:
+        log_texto = ler_log(st.session_state.log_atual)
+        progresso = calcular_progresso(log_texto)
+
+        st.progress(progresso / 100)
+        st.caption(f"Executando... {progresso}%")
+
+
 detectar_finalizacao_processo()
 
 if processo_rodando():
@@ -353,6 +363,8 @@ with col_esq:
                 "Extração de placas do Tracers"
             )
             st.rerun()
+
+        mostrar_progresso_etapa("Extração de placas do Tracers")
 
     st.subheader("2. Enviar Excel para Mind7")
 
@@ -454,18 +466,12 @@ with col_dir:
                 "Consulta de CPFs/CNPJs no Mind7"
             )
             st.rerun()
+
+        mostrar_progresso_etapa("Consulta de CPFs/CNPJs no Mind7")
     else:
         st.info("Copie o Excel para o Mind7 primeiro.")
 
 st.divider()
-
-st.subheader("📊 Progresso em tempo real")
-
-log_texto = ler_log(st.session_state.log_atual)
-progresso = calcular_progresso(log_texto)
-
-st.progress(progresso / 100)
-st.write(f"Progresso estimado: **{progresso}%**")
 
 st.subheader("📜 Logs organizados")
 
