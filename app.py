@@ -9,6 +9,47 @@ from io import StringIO
 from pathlib import Path
 from openpyxl import load_workbook
 from streamlit_autorefresh import st_autorefresh
+import threading
+import time
+
+MONITOR_INICIADO = False
+
+
+def monitorar_conexao():
+    time.sleep(20)
+
+    while True:
+        time.sleep(10)
+
+        try:
+            conexoes = psutil.net_connections(kind="inet")
+
+            conexoes_ativas = [
+                c for c in conexoes
+                if c.laddr
+                and c.laddr.port == 8501
+                and c.status == psutil.CONN_ESTABLISHED
+            ]
+
+            if len(conexoes_ativas) == 0:
+                processo = psutil.Process(os.getpid())
+
+                for filho in processo.children(recursive=True):
+                    try:
+                        filho.terminate()
+                    except Exception:
+                        pass
+
+                processo.terminate()
+                break
+
+        except Exception:
+            pass
+
+
+if not MONITOR_INICIADO:
+    threading.Thread(target=monitorar_conexao, daemon=True).start()
+    MONITOR_INICIADO = True
 
 st.set_page_config(
     page_title="Automação Tracers + Mind7",
@@ -323,8 +364,14 @@ with col_esq:
         )
     )
 
+    if not st.session_state.etapa_tracers_ok:
+        st.info("Conclua a etapa 1 primeiro.")
+
     if EXCEL_TRACERS.exists():
-        if st.button(texto_botao_envio, disabled=processo_rodando()):
+        if st.button(
+            texto_botao_envio,
+            disabled=processo_rodando() or not st.session_state.etapa_tracers_ok
+        ):
             try:
                 shutil.copy2(EXCEL_TRACERS, EXCEL_MIND7)
                 st.session_state.etapa_envio_ok = True
@@ -351,10 +398,16 @@ with col_dir:
         )
     )
 
+    if not st.session_state.etapa_envio_ok:
+        st.info("Conclua a etapa 2 primeiro.")
+
     if not chrome_bat.exists():
         st.error(f"Arquivo abrir_chrome_mind7.bat não encontrado em:\n{chrome_bat}")
     else:
-        if st.button(texto_botao_chrome, disabled=processo_rodando()):
+        if st.button(
+            texto_botao_chrome,
+            disabled=processo_rodando() or not st.session_state.etapa_envio_ok
+        ):
             try:
                 subprocess.Popen(
                     ["cmd", "/c", str(chrome_bat)],
@@ -380,10 +433,16 @@ with col_dir:
         )
     )
 
+    if not st.session_state.etapa_chrome_ok:
+        st.info("Conclua a etapa 3 primeiro.")
+
     if not (MIND7 / "consultar_mind7.py").exists():
         st.error(f"Arquivo consultar_mind7.py não encontrado em:\n{MIND7}")
     elif EXCEL_MIND7.exists():
-        if st.button(texto_botao_consulta, disabled=processo_rodando()):
+        if st.button(
+            texto_botao_consulta,
+            disabled=processo_rodando() or not st.session_state.etapa_chrome_ok
+        ):
             st.session_state.etapa_consulta_ok = False
             st.session_state.etapa_consulta_erro = False
             st.session_state.consulta_iniciada = True
@@ -434,6 +493,16 @@ st.divider()
 
 st.subheader("📥 Baixar arquivo")
 
+todas_etapas_concluidas = (
+    st.session_state.etapa_tracers_ok
+    and st.session_state.etapa_envio_ok
+    and st.session_state.etapa_chrome_ok
+    and st.session_state.etapa_consulta_ok
+)
+
+if not todas_etapas_concluidas:
+    st.warning("Finalize as 4 etapas da automação antes de baixar o relatório.")
+
 arquivos_disponiveis = {
     "Resultado completo - Excel": RESULTADO,
     "Somente CPFs - Excel": CPFS,
@@ -447,12 +516,15 @@ arquivos_disponiveis = {
 
 opcao_download = st.selectbox(
     "Escolha o arquivo para baixar:",
-    list(arquivos_disponiveis.keys())
+    list(arquivos_disponiveis.keys()),
+    disabled=not todas_etapas_concluidas
 )
 
 arquivo_escolhido = arquivos_disponiveis[opcao_download]
 
-if not arquivo_escolhido.exists():
+if not todas_etapas_concluidas:
+    st.button("📥 Baixar arquivo selecionado", disabled=True)
+elif not arquivo_escolhido.exists():
     st.info("Esse arquivo ainda não foi gerado.")
 else:
     if "CSV" in opcao_download:
