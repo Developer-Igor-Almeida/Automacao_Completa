@@ -53,8 +53,23 @@ if not MIND7.exists():
 # SESSION STATE
 # =========================
 
-if "processo" not in st.session_state:
-    st.session_state.processo = None
+valores_iniciais = {
+    "processo": None,
+    "etapa": "",
+    "log_atual": None,
+    "erro_pausado": False,
+    "mensagem_erro_pausado": "",
+    "etapa_tracers_ok": False,
+    "etapa_envio_ok": False,
+    "etapa_chrome_ok": False,
+    "etapa_consulta_ok": False,
+    "etapa_tracers_erro": False,
+    "etapa_envio_erro": False,
+    "etapa_chrome_erro": False,
+    "etapa_consulta_erro": False,
+    "tracers_iniciado": False,
+    "consulta_iniciada": False,
+}
 
 if "etapa" not in st.session_state:
     st.session_state.etapa = ""
@@ -77,8 +92,9 @@ for chave in [
     "tracers_iniciado",
     "consulta_iniciada",
 ]:
+for chave, valor in valores_iniciais.items():
     if chave not in st.session_state:
-        st.session_state[chave] = False
+        st.session_state[chave] = valor
 
 
 def monitorar_conexao():
@@ -117,6 +133,9 @@ if not st.session_state.monitor_iniciado:
     threading.Thread(target=monitorar_conexao, daemon=True).start()
     st.session_state.monitor_iniciado = True
 
+# =========================
+# FUNÇÕES
+# =========================
 
 def processo_rodando():
     p = st.session_state.processo
@@ -131,30 +150,58 @@ def icone_status(ok, erro):
     return ""
 
 
-def detectar_finalizacao_processo():
-    p = st.session_state.processo
+def ler_log(log_path):
+    if not log_path or not Path(log_path).exists():
+        return ""
+    return Path(log_path).read_text(encoding="utf-8", errors="ignore")
 
-    if p is not None and p.poll() is not None and st.session_state.etapa:
-        codigo = p.returncode
 
-        if st.session_state.etapa == "Extração de placas do Tracers":
-            if codigo == 0 and st.session_state.tracers_iniciado and EXCEL_TRACERS.exists():
-                st.session_state.etapa_tracers_ok = True
-                st.session_state.etapa_tracers_erro = False
-            else:
-                st.session_state.etapa_tracers_ok = False
-                st.session_state.etapa_tracers_erro = True
+def corrigir_acentos_log(texto):
+    if not texto:
+        return ""
 
-        elif st.session_state.etapa == "Consulta de CPFs/CNPJs no Mind7":
-            if codigo == 0 and st.session_state.consulta_iniciada and RESULTADO.exists():
-                st.session_state.etapa_consulta_ok = True
-                st.session_state.etapa_consulta_erro = False
-            else:
-                st.session_state.etapa_consulta_ok = False
-                st.session_state.etapa_consulta_erro = True
+    correcoes = {
+        "execuÃ§Ã£o": "execução",
+        "automaÃ§Ã£o": "automação",
+        "nÃ£o": "não",
+        "estÃ¡": "está",
+        "conexÃ£o": "conexão",
+        "informaÃ§Ãµes": "informações",
+        "veÃ­culo": "veículo",
+        "prÃ³xima": "próxima",
+        "validaÃ§Ã£o": "validação",
+        "possÃ­vel": "possível",
+        "cÃ³digo": "código",
+        "usuÃ¡rio": "usuário",
+        "aplicaÃ§Ã£o": "aplicação",
+        "extraÃ§Ã£o": "extração",
+    }
 
-        st.session_state.processo = None
-        st.session_state.etapa = ""
+    for errado, certo in correcoes.items():
+        texto = texto.replace(errado, certo)
+
+    return texto
+
+
+def detectar_erro_usuario_saiu(log_texto):
+    if not log_texto:
+        return False
+
+    texto = log_texto.lower()
+
+    erros = [
+        "no devices/emulators found",
+        "device not found",
+        "uiautomator",
+        "window_dump",
+        "adb.exe",
+        "erro ao executar",
+        "app_tracers_fechado",
+        "não está aberto em primeiro plano",
+        "nao esta aberto em primeiro plano",
+    ]
+
+    return any(e in texto for e in erros)
 
 
 def iniciar_processo(cmd, pasta, log_path, etapa):
@@ -163,9 +210,11 @@ def iniciar_processo(cmd, pasta, log_path, etapa):
 
     log_file = open(log_path, "a", encoding="utf-8")
 
-    flags = 0
-    if os.name == "nt":
-        flags = subprocess.CREATE_NO_WINDOW
+    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
 
     try:
         p = subprocess.Popen(
@@ -174,7 +223,8 @@ def iniciar_processo(cmd, pasta, log_path, etapa):
             stdout=log_file,
             stderr=log_file,
             text=True,
-            creationflags=flags
+            creationflags=flags,
+            env=env
         )
 
         st.session_state.processo = p
@@ -207,11 +257,75 @@ def parar_processo():
     st.session_state.etapa = ""
 
 
-def ler_log(log_path):
-    if not log_path or not Path(log_path).exists():
-        return ""
+def pausar_por_erro_tracers():
+    parar_processo()
 
-    return Path(log_path).read_text(encoding="utf-8", errors="ignore")
+    st.session_state.erro_pausado = True
+    st.session_state.etapa_tracers_ok = False
+    st.session_state.etapa_tracers_erro = True
+
+    st.session_state.mensagem_erro_pausado = (
+        "❌ O celular foi desconectado, o aplicativo Tracers foi fechado "
+        "ou a tela correta não está aberta.\n\n"
+        "Verifique:\n"
+        "- Celular conectado\n"
+        "- Depuração USB ativa\n"
+        "- Aplicativo Tracers aberto\n"
+        "- Tela da lista de veículos visível\n\n"
+        "Depois clique em CONTINUAR."
+    )
+
+    with open(LOG_TRACERS, "a", encoding="utf-8") as log:
+        log.write("\n\n==============================\n")
+        log.write("ERRO AMIGÁVEL\n")
+        log.write("==============================\n")
+        log.write("O processo foi pausado porque o celular/app não estava disponível.\n")
+        log.write("Verifique o celular e mantenha o aplicativo Tracers aberto na tela correta.\n")
+
+
+def detectar_finalizacao_processo():
+    p = st.session_state.processo
+
+    if p is not None and p.poll() is not None and st.session_state.etapa:
+        codigo = p.returncode
+        etapa_atual = st.session_state.etapa
+        log_texto = ler_log(st.session_state.log_atual)
+
+        if etapa_atual == "Extração de placas do Tracers":
+            if detectar_erro_usuario_saiu(log_texto):
+                pausar_por_erro_tracers()
+
+            elif codigo == 0 and st.session_state.tracers_iniciado and EXCEL_TRACERS.exists():
+                st.session_state.etapa_tracers_ok = True
+                st.session_state.etapa_tracers_erro = False
+
+            else:
+                st.session_state.etapa_tracers_ok = False
+                st.session_state.etapa_tracers_erro = True
+
+        elif etapa_atual == "Consulta de CPFs/CNPJs no Mind7":
+            if codigo == 0 and st.session_state.consulta_iniciada and RESULTADO.exists():
+                st.session_state.etapa_consulta_ok = True
+                st.session_state.etapa_consulta_erro = False
+            else:
+                st.session_state.etapa_consulta_ok = False
+                st.session_state.etapa_consulta_erro = True
+
+        st.session_state.processo = None
+        st.session_state.etapa = ""
+
+
+def monitorar_erro_em_tempo_real():
+    if not processo_rodando():
+        return
+
+    if st.session_state.etapa != "Extração de placas do Tracers":
+        return
+
+    log_texto = ler_log(st.session_state.log_atual)
+
+    if detectar_erro_usuario_saiu(log_texto):
+        pausar_por_erro_tracers()
 
 
 def limpar_logs():
@@ -232,10 +346,7 @@ def converter_xlsx_para_csv(caminho_xlsx):
     writer = csv.writer(output, delimiter=";")
 
     for row in ws.iter_rows(values_only=True):
-        writer.writerow([
-            "" if valor is None else valor
-            for valor in row
-        ])
+        writer.writerow(["" if valor is None else valor for valor in row])
 
     return output.getvalue().encode("utf-8-sig")
 
@@ -274,11 +385,78 @@ def mostrar_progresso_etapa(nome_etapa):
         st.caption(f"Executando... {progresso}%")
 
 
+def mensagem_amigavel_por_etapa(etapa, log_texto):
+    texto = corrigir_acentos_log(log_texto).lower()
+
+    if st.session_state.erro_pausado:
+        return st.session_state.mensagem_erro_pausado
+
+    if etapa == "Extração de placas do Tracers":
+        if detectar_erro_usuario_saiu(texto):
+            return (
+                "⚠️ Problema detectado com o celular ou aplicativo Tracers.\n\n"
+                "Verifique se o celular está conectado, desbloqueado e com o Tracers aberto."
+            )
+
+        if "finalizado" in texto:
+            return "✅ Extração de placas finalizada com sucesso."
+
+        return (
+            "📱 Extração de placas em andamento.\n\n"
+            "Mantenha o celular conectado, desbloqueado e com o aplicativo Tracers aberto."
+        )
+
+    if etapa == "Consulta de CPFs/CNPJs no Mind7":
+        if "captcha" in texto:
+            return (
+                "⚠️ O Mind7 solicitou validação CAPTCHA.\n\n"
+                "A automação tentará novamente as placas pendentes. "
+                "Se necessário, resolva a validação no navegador."
+            )
+
+        if "conectado ao chrome" in texto:
+            return (
+                "🔎 Consulta no Mind7 em andamento.\n\n"
+                "Não feche o Chrome e mantenha o usuário logado no Mind7."
+            )
+
+        if "finalizado" in texto:
+            return "✅ Consulta no Mind7 finalizada com sucesso."
+
+        return (
+            "🔎 Preparando consulta no Mind7.\n\n"
+            "Verifique se o Chrome está aberto e logado no sistema."
+        )
+
+    if "permissionerror" in texto or "permission denied" in texto:
+        return (
+            "⚠️ Não foi possível salvar o Excel.\n\n"
+            "Feche a planilha se ela estiver aberta e tente novamente."
+        )
+
+    if "traceback" in texto or "runtimeerror" in texto:
+        return (
+            "⚠️ A automação encontrou um problema.\n\n"
+            "Verifique se os sistemas estão abertos corretamente e tente novamente."
+        )
+
+    return ""
+
+
+# =========================
+# MONITORAMENTO
+# =========================
+
 detectar_finalizacao_processo()
+monitorar_erro_em_tempo_real()
 
 if processo_rodando():
-    st_autorefresh(interval=1500, key="refresh_app")
+    st_autorefresh(interval=2000, key="refresh_app")
 
+
+# =========================
+# INTERFACE
+# =========================
 
 st.markdown("""
 <style>
@@ -333,6 +511,24 @@ if processo_rodando():
 else:
     st.success("Nenhuma automação em execução no momento.")
 
+if st.session_state.erro_pausado:
+    st.error(st.session_state.mensagem_erro_pausado)
+
+    if st.button("▶️ Continuar após correção", type="primary"):
+        st.session_state.erro_pausado = False
+        st.session_state.mensagem_erro_pausado = ""
+        st.session_state.etapa_tracers_erro = False
+        st.session_state.tracers_iniciado = True
+
+        iniciar_processo(
+            ["python", "-u", "extrair_tracers.py"],
+            TRACERS,
+            LOG_TRACERS,
+            "Extração de placas do Tracers"
+        )
+
+        st.rerun()
+
 st.divider()
 
 col_esq, col_dir = st.columns(2)
@@ -354,6 +550,8 @@ with col_esq:
         if st.button(texto_botao_tracers, disabled=processo_rodando()):
             st.session_state.etapa_tracers_ok = False
             st.session_state.etapa_tracers_erro = False
+            st.session_state.erro_pausado = False
+            st.session_state.mensagem_erro_pausado = ""
             st.session_state.tracers_iniciado = True
 
             iniciar_processo(
@@ -487,13 +685,24 @@ with col_log2:
     if st.button("🔄 Atualizar logs"):
         st.rerun()
 
-with st.expander("Ver logs da execução", expanded=True):
-    log_texto = ler_log(st.session_state.log_atual)
+with st.expander("Status da execução", expanded=True):
+    log_texto = corrigir_acentos_log(ler_log(st.session_state.log_atual))
+    mensagem = mensagem_amigavel_por_etapa(st.session_state.etapa, log_texto)
+
+    if mensagem:
+        st.info(mensagem)
+    elif log_texto:
+        st.success("Processo em andamento ou finalizado sem erro crítico.")
+    else:
+        st.info("Nenhum processo iniciado ainda.")
+
+with st.expander("Logs técnicos para suporte", expanded=False):
+    log_texto = corrigir_acentos_log(ler_log(st.session_state.log_atual))
 
     if log_texto:
         st.code(log_texto[-8000:])
     else:
-        st.info("Nenhum log iniciado ainda.")
+        st.info("Nenhum log técnico disponível.")
 
 st.divider()
 
