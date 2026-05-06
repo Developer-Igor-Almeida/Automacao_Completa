@@ -40,55 +40,15 @@ def aguardar_usuario_iniciar():
     print("Confirmação feita pela interface. Iniciando coleta...", flush=True)
 
 
-def run(cmd, check=True):
+def run(cmd):
     result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
-
-    if check and result.returncode != 0:
+    if result.returncode != 0:
         raise RuntimeError(
             f"Erro ao executar: {' '.join(cmd)}\n\n"
             f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
         )
+    return result.stdout.strip()
 
-    return result
-
-def obter_app_em_primeiro_plano():
-    comandos = [
-        [ADB, "shell", "dumpsys", "window"],
-        [ADB, "shell", "dumpsys", "activity", "activities"],
-    ]
-
-    texto_total = ""
-
-    for cmd in comandos:
-        resultado = run(cmd, check=False)
-        texto_total += "\n" + (resultado.stdout or "")
-        texto_total += "\n" + (resultado.stderr or "")
-
-    texto = texto_total.lower()
-
-    padroes = [
-        r"mcurrentfocus=.*?\s([a-z0-9_.]+)\/",
-        r"mfocusedapp=.*?\s([a-z0-9_.]+)\/",
-        r"topresumedactivity=.*?\s([a-z0-9_.]+)\/",
-        r"resumedactivity:.*?\s([a-z0-9_.]+)\/",
-    ]
-
-    for padrao in padroes:
-        match = re.search(padrao, texto)
-        if match:
-            return match.group(1)
-
-    return texto
-
-
-def validar_tracers_aberto():
-    app_atual = obter_app_em_primeiro_plano()
-
-    if "br.app.tracers" not in app_atual and "tracers" not in app_atual:
-        raise RuntimeError(
-            "APP_TRACERS_FECHADO: O aplicativo Tracers não está aberto em primeiro plano. "
-            "Abra o Tracers na tela da lista de veículos e tente novamente."
-        )
 
 def deve_ignorar_como_modelo(texto: str) -> bool:
     t = texto.lower().strip()
@@ -106,10 +66,7 @@ def deve_ignorar_como_modelo(texto: str) -> bool:
 
 
 def capturar_xml():
-    validar_tracers_aberto()
-
     run([ADB, "shell", "uiautomator", "dump", "/sdcard/window_dump.xml"])
-    run([ADB, "shell", "test", "-f", "/sdcard/window_dump.xml"])
     run([ADB, "pull", "/sdcard/window_dump.xml", str(XML_FILE)])
 
 
@@ -264,8 +221,6 @@ def salvar_excel(registros, caminho: Path):
 
 
 def swipe_para_cima():
-    validar_tracers_aberto()
-
     run([
         ADB, "shell", "input", "swipe",
         str(SWIPE_X),
@@ -274,7 +229,6 @@ def swipe_para_cima():
         str(SWIPE_Y_FIM),
         str(SWIPE_DURACAO_MS)
     ])
-
     time.sleep(TEMPO_ESPERA_APOS_SWIPE)
 
 

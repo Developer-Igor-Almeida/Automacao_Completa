@@ -1,5 +1,0 @@
-streamlit
-streamlit-autorefresh
-psutil
-openpyxl
-playwright
