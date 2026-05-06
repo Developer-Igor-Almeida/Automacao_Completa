@@ -1,62 +1,46 @@
+"""
+Serviço responsável por escolher mensagens amigáveis
+com base na etapa atual e no conteúdo dos logs.
+"""
+
 import streamlit as st
 
+from backend.constants.messages import (TRACERS_RUNTIME_ERROR_MESSAGE,TRACERS_FINISHED_MESSAGE,TRACERS_RUNNING_MESSAGE,
+MIND7_CAPTCHA_MESSAGE,MIND7_RUNNING_MESSAGE,MIND7_FINISHED_MESSAGE,
+MIND7_PREPARING_MESSAGE,FILE_PERMISSION_ERROR_MESSAGE,GENERIC_AUTOMATION_ERROR_MESSAGE,)
+from backend.constants.process import TRACERS_STEP_NAME, MIND7_STEP_NAME
 from backend.core.logs import corrigir_acentos_log
-from backend.services.process_service import detectar_erro_usuario_saiu
+from backend.services.process_service import detect_tracers_runtime_error
 
+MESSAGE_RULES_BY_STEP = {
+    TRACERS_STEP_NAME: [
+        (detect_tracers_runtime_error, TRACERS_RUNTIME_ERROR_MESSAGE),
+        (lambda text: "finalizado" in text, TRACERS_FINISHED_MESSAGE),
+        (lambda text: True, TRACERS_RUNNING_MESSAGE),
+    ],
+    MIND7_STEP_NAME: [
+        (lambda text: "captcha" in text, MIND7_CAPTCHA_MESSAGE),
+        (lambda text: "conectado ao chrome" in text, MIND7_RUNNING_MESSAGE),
+        (lambda text: "finalizado" in text, MIND7_FINISHED_MESSAGE),
+        (lambda text: True, MIND7_PREPARING_MESSAGE),
+    ],
+}
 
-def mensagem_amigavel_por_etapa(etapa, log_texto):
-    texto = corrigir_acentos_log(log_texto).lower()
+GENERIC_MESSAGE_RULES = [
+    (lambda text: "permissionerror" in text or "permission denied" in text, FILE_PERMISSION_ERROR_MESSAGE,),
+    (lambda text: "traceback" in text or "runtimeerror" in text,GENERIC_AUTOMATION_ERROR_MESSAGE,),
+]
 
-    if st.session_state.erro_pausado:
-        return st.session_state.mensagem_erro_pausado
+def get_friendly_message_by_step(step_name: str, log_text: str) -> str:
+    normalized_text = corrigir_acentos_log(log_text).lower()
+    if st.session_state.is_paused_by_error:
+        return st.session_state.paused_error_message
 
-    if etapa == "Extração de placas do Tracers":
-        if detectar_erro_usuario_saiu(texto):
-            return (
-                "⚠️ Problema detectado com o celular ou aplicativo Tracers.\n\n"
-                "Verifique se o celular está conectado, desbloqueado e com o Tracers aberto."
-            )
+    rules = MESSAGE_RULES_BY_STEP.get(step_name,GENERIC_MESSAGE_RULES,)
+    return _resolve_message_from_rules(rules=rules,text=normalized_text,)
 
-        if "finalizado" in texto:
-            return "✅ Extração de placas finalizada com sucesso."
-
-        return (
-            "📱 Extração de placas em andamento.\n\n"
-            "Mantenha o celular conectado, desbloqueado e com o aplicativo Tracers aberto."
-        )
-
-    if etapa == "Consulta de CPFs/CNPJs no Mind7":
-        if "captcha" in texto:
-            return (
-                "⚠️ O Mind7 solicitou validação CAPTCHA.\n\n"
-                "A automação tentará novamente as placas pendentes. "
-                "Se necessário, resolva a validação no navegador."
-            )
-
-        if "conectado ao chrome" in texto:
-            return (
-                "🔎 Consulta no Mind7 em andamento.\n\n"
-                "Não feche o Chrome e mantenha o usuário logado no Mind7."
-            )
-
-        if "finalizado" in texto:
-            return "✅ Consulta no Mind7 finalizada com sucesso."
-
-        return (
-            "🔎 Preparando consulta no Mind7.\n\n"
-            "Verifique se o Chrome está aberto e logado no sistema."
-        )
-
-    if "permissionerror" in texto or "permission denied" in texto:
-        return (
-            "⚠️ Não foi possível salvar o Excel.\n\n"
-            "Feche a planilha se ela estiver aberta e tente novamente."
-        )
-
-    if "traceback" in texto or "runtimeerror" in texto:
-        return (
-            "⚠️ A automação encontrou um problema.\n\n"
-            "Verifique se os sistemas estão abertos corretamente e tente novamente."
-        )
-
+def _resolve_message_from_rules(rules: list, text: str) -> str:
+    for condition, message in rules:
+        if condition(text):
+            return message
     return ""

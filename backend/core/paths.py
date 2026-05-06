@@ -1,42 +1,82 @@
+"""
+Centralizador de caminhos da aplicação.
+
+Esse módulo contém todos os diretórios e arquivos utilizados
+pelo sistema.
+
+Objetivos:
+- evitar caminhos duplicados
+- facilitar manutenção
+- simplificar refatorações
+- melhorar legibilidade
+- padronizar acessos a arquivos
+
+Todo novo path da aplicação deve ser criado aqui.
+"""
+
 from pathlib import Path
 
+# =========================================================
+# BASE DIRECTORIES
+# =========================================================
+
 BASE_DIR = Path(__file__).resolve().parents[2]
-
-AUTOMATIONS = BASE_DIR / "automations"
-
-TRACERS = AUTOMATIONS / "tracers"
-MIND7 = AUTOMATIONS / "mind7"
-
-LOG_DIR = BASE_DIR / "logs"
-LOG_TRACERS = LOG_DIR / "tracers.log"
-LOG_MIND7 = LOG_DIR / "mind7.log"
-
-TRACERS_SCRIPTS = TRACERS / "scripts"
-TRACERS_SAIDA = TRACERS / "saida"
-
-MIND7_SCRIPTS = MIND7 / "scripts"
-MIND7_ENTRADA = MIND7 / "entrada"
-MIND7_SAIDA = MIND7 / "saida"
-
-EXCEL_TRACERS = TRACERS_SAIDA / "veiculos_tracers.xlsx"
-EXCEL_MIND7 = MIND7_ENTRADA / "veiculos_tracers.xlsx"
-
-RESULTADO = MIND7_SAIDA / "veiculos_tracers_com_cpf.xlsx"
-CPFS = MIND7_SAIDA / "somente_cpfs.xlsx"
-CPFS_CNPJS = MIND7_SAIDA / "cpfs_e_cnpjs.xlsx"
-CNPJS = MIND7_SAIDA / "somente_cnpjs.xlsx"
-
-SCRIPT_TRACERS = TRACERS_SCRIPTS / "extrair_tracers.py"
-SCRIPT_MIND7 = MIND7_SCRIPTS / "consultar_mind7.py"
-BAT_CHROME_MIND7 = MIND7_SCRIPTS / "abrir_chrome_mind7.bat"
+AUTOMATIONS_DIR = BASE_DIR / "automations"
+TRACERS_DIR = AUTOMATIONS_DIR / "tracers"
+MIND7_DIR = AUTOMATIONS_DIR / "mind7"
+LOGS_DIR = BASE_DIR / "logs"
 
 
-def criar_pastas():
-    LOG_DIR.mkdir(exist_ok=True)
-    TRACERS_SAIDA.mkdir(parents=True, exist_ok=True)
-    MIND7_ENTRADA.mkdir(parents=True, exist_ok=True)
-    MIND7_SAIDA.mkdir(parents=True, exist_ok=True)
+# =========================================================
+# LOG FILES
+# =========================================================
+
+TRACERS_LOG_FILE = LOGS_DIR / "tracers.log"
+MIND7_LOG_FILE = LOGS_DIR / "mind7.log"
 
 
-def pastas_obrigatorias_existem():
-    return TRACERS.exists() and MIND7.exists()
+# =========================================================
+# TRACERS
+# =========================================================
+
+TRACERS_SCRIPTS_DIR = TRACERS_DIR / "scripts"
+TRACERS_OUTPUT_DIR = TRACERS_DIR / "saida"
+TRACERS_SCRIPT = TRACERS_SCRIPTS_DIR / "extrair_tracers.py"
+TRACERS_EXCEL_FILE = TRACERS_OUTPUT_DIR / "veiculos_tracers.xlsx"
+
+
+# =========================================================
+# MIND7
+# =========================================================
+
+MIND7_SCRIPTS_DIR = MIND7_DIR / "scripts"
+MIND7_INPUT_DIR = MIND7_DIR / "entrada"
+MIND7_OUTPUT_DIR = MIND7_DIR / "saida"
+MIND7_SCRIPT = MIND7_SCRIPTS_DIR / "consultar_mind7.py"
+MIND7_CHROME_BAT = MIND7_SCRIPTS_DIR / "abrir_chrome_mind7.bat"
+MIND7_INPUT_EXCEL_FILE = MIND7_INPUT_DIR / "veiculos_tracers.xlsx"
+
+
+# =========================================================
+# OUTPUT FILES
+# =========================================================
+
+FINAL_RESULT_FILE = MIND7_OUTPUT_DIR / "veiculos_tracers_com_cpf.xlsx"
+CPF_ONLY_FILE = MIND7_OUTPUT_DIR / "somente_cpfs.xlsx"
+CPF_CNPJ_FILE = MIND7_OUTPUT_DIR / "cpfs_e_cnpjs.xlsx"
+CNPJ_ONLY_FILE = MIND7_OUTPUT_DIR / "somente_cnpjs.xlsx"
+
+
+# =========================================================
+# HELPERS
+# =========================================================
+
+def create_required_directories():
+    LOGS_DIR.mkdir(exist_ok=True)
+    TRACERS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    MIND7_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    MIND7_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def required_directories_exist():
+    return TRACERS_DIR.exists() and MIND7_DIR.exists()
