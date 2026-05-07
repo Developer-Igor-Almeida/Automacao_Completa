@@ -13,33 +13,11 @@ from pathlib import Path
 import streamlit as st
 
 from backend.constants.process import TRACERS_STEP_NAME, MIND7_STEP_NAME
-from backend.core.paths import (
-    TRACERS_DIR,
-    MIND7_DIR,
-    TRACERS_LOG_FILE,
-    MIND7_LOG_FILE,
-    TRACERS_EXCEL_FILE,
-    MIND7_INPUT_EXCEL_FILE,
-    TRACERS_SCRIPT,
-    MIND7_SCRIPT,
-    MIND7_CHROME_BAT,
-)
-from backend.constants.messages import (
-    OPEN_CHROME_BUTTON_LABEL,
-    SEND_TO_MIND7_BUTTON_LABEL,
-    START_MIND7_CONSULTATION_BUTTON_LABEL,
-    TRACERS_START_BUTTON_LABEL,
-)
-from backend.core.state import (
-    is_process_running,
-    get_status_icon,
-    set_step_status,
-)
+from backend.core.paths import (TRACERS_DIR,MIND7_DIR,TRACERS_LOG_FILE,MIND7_LOG_FILE,TRACERS_EXCEL_FILE,MIND7_INPUT_EXCEL_FILE,TRACERS_SCRIPT,MIND7_SCRIPT,MIND7_CHROME_BAT,)
+from backend.constants.messages import (OPEN_CHROME_BUTTON_LABEL,SEND_TO_MIND7_BUTTON_LABEL,START_MIND7_CONSULTATION_BUTTON_LABEL,TRACERS_START_BUTTON_LABEL,)
+from backend.core.state import (is_process_running,get_status_icon,set_step_status,)
 from backend.core.paths import (TRACERS_DIR,MIND7_DIR,TRACERS_LOG_FILE, MIND7_LOG_FILE,TRACERS_EXCEL_FILE, BASE_DIR,
  MIND7_INPUT_EXCEL_FILE,TRACERS_SCRIPT,MIND7_SCRIPT,MIND7_CHROME_BAT,)
-from backend.constants.messages import (CHROME_OPENED_SUCCESS_MESSAGE,COPY_EXCEL_FIRST_MESSAGE,FILE_COPIED_SUCCESS_MESSAGE, FINISH_STEP_1_FIRST_MESSAGE,
- FINISH_STEP_2_FIRST_MESSAGE, FINISH_STEP_3_FIRST_MESSAGE, OPEN_CHROME_BUTTON_LABEL, RUN_TRACERS_FIRST_MESSAGE,SEND_TO_MIND7_BUTTON_LABEL,
-    START_MIND7_CONSULTATION_BUTTON_LABEL, TRACERS_START_BUTTON_LABEL,)
 from backend.core.state import (get_status_icon,is_process_running,set_step_status,)
 from backend.services.process_service import start_process
 from backend.services.file_service import copy_file
@@ -181,7 +159,6 @@ def _render_continue_after_error() -> None:
         start_process([sys.executable, "-u", str(TRACERS_SCRIPT)],BASE_DIR,TRACERS_LOG_FILE,TRACERS_STEP_NAME,)
         st.rerun()
 
-
 def _render_tracers_step() -> None:
     """Etapa 1: Extrair placas do Tracers."""
     _render_step_title(1, "🚘", "Extrair placas do Tracers")
@@ -213,8 +190,6 @@ def _render_tracers_step() -> None:
         )
 
         st.rerun()
-
-
 
 def _render_send_to_mind7_step() -> None:
     """Etapa 2: Enviar Excel para Mind7."""
