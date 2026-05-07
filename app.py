@@ -38,7 +38,6 @@ def validate_project_structure() -> None:
 
     st.stop()
 
-
 def main() -> None:
     validate_project_structure()
     initialize_session_state()
@@ -56,7 +55,6 @@ def main() -> None:
     render_steps()
     render_logs_panel()
     render_downloads()
-
 
 if __name__ == "__main__":
     main()

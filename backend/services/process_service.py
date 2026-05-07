@@ -22,7 +22,7 @@ from backend.constants.errors import TRACERS_RUNTIME_ERRORS
 from backend.constants.messages import (PROCESS_START_ERROR_MESSAGE,TRACERS_DISCONNECTED_MESSAGE,TRACERS_FRIENDLY_LOG_MESSAGE,TRACERS_FRIENDLY_LOG_TITLE,)
 from backend.constants.process import (MIND7_STEP_NAME,MONITOR_CHECK_INTERVAL_SECONDS,MONITOR_INITIAL_DELAY_SECONDS,STEP_ERROR_STATE_KEYS,STREAMLIT_PORT,TRACERS_STEP_NAME,)
 from backend.core.logs import (fix_broken_text_encoding, read_log,)
-from backend.core.paths import (FINAL_RESULT_FILE,TRACERS_EXCEL_FILE,TRACERS_LOG_FILE,)
+from backend.core.paths import (FINAL_RESULT_FILE,TRACERS_EXCEL_FILE,TRACERS_LOG_FILE, BASE_DIR)
 from backend.core.state import is_process_running
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ def detect_tracers_runtime_error(log_text: str) -> bool:
     if not log_text:
         return False
 
-    normalized_text = corrigir_acentos_log(log_text).lower()
+    normalized_text = fix_broken_text_encoding(log_text).lower()
     return any(error_pattern in normalized_text for error_pattern in TRACERS_RUNTIME_ERRORS)
 
 def pause_tracers_due_to_error():
@@ -217,6 +217,7 @@ def _build_process_env() -> dict:
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
+    env["PYTHONPATH"] = str(BASE_DIR)
 
     return env
 
