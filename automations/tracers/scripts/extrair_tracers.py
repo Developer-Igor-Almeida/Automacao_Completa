@@ -1,29 +1,13 @@
-import subprocess
-import xml.etree.ElementTree as ET
-import re
 import html
+import re
+import subprocess
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from automations.tracers.config.settings import (EXCEL_FILE_NAME,MAX_SCROLLS,MAX_SCREENS_WITHOUT_NEW_ITEMS,
+ REMOTE_XML_PATH, SWIPE_DURATION_MS, SWIPE_END_Y, SWIPE_START_Y, SWIPE_WAIT_SECONDS, SWIPE_X, XML_FILE_NAME,)
 from openpyxl import Workbook
-
-BASE_DIR = Path(__file__).parent
-ADB = str(BASE_DIR / "platform-tools" / "adb.exe")
-
-OUT_DIR = BASE_DIR / "saida"
-XML_FILE = BASE_DIR / "window_dump.xml"
-XLSX_FILE = OUT_DIR / "veiculos_tracers.xlsx"
-
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-MAX_ROLAGENS = 3000
-TEMPO_ESPERA_APOS_SWIPE = 0.8
-
-SWIPE_X = 500
-SWIPE_Y_INICIO = 1550
-SWIPE_Y_FIM = 850
-SWIPE_DURACAO_MS = 350
-
-MAX_TELAS_SEM_NOVIDADE = 15
+from backend.core.paths import (TRACERS_ADB_PATH,TRACERS_EXCEL_FILE,TRACERS_TEMP_DIR,TRACERS_WINDOW_DUMP_FILE,)
 
 
 def aguardar_usuario_iniciar():
@@ -66,8 +50,8 @@ def deve_ignorar_como_modelo(texto: str) -> bool:
 
 
 def capturar_xml():
-    run([ADB, "shell", "uiautomator", "dump", "/sdcard/window_dump.xml"])
-    run([ADB, "pull", "/sdcard/window_dump.xml", str(XML_FILE)])
+    run([TRACERS_ADB_PATH, "shell", "uiautomator", "dump", "/sdcard/window_dump.xml"])
+    run([TRACERS_ADB_PATH, "pull", "/sdcard/window_dump.xml", str(TRACERS_WINDOW_DUMP_FILE)])
 
 
 def limpar_texto(texto: str) -> str:
@@ -222,14 +206,14 @@ def salvar_excel(registros, caminho: Path):
 
 def swipe_para_cima():
     run([
-        ADB, "shell", "input", "swipe",
+        TRACERS_ADB_PATH, "shell", "input", "swipe",
         str(SWIPE_X),
-        str(SWIPE_Y_INICIO),
+        str(SWIPE_START_Y),
         str(SWIPE_X),
-        str(SWIPE_Y_FIM),
-        str(SWIPE_DURACAO_MS)
+        str(SWIPE_END_Y),
+        str(SWIPE_DURATION_MS)
     ])
-    time.sleep(TEMPO_ESPERA_APOS_SWIPE)
+    time.sleep(SWIPE_WAIT_SECONDS)
 
 
 def coletar_multiplas_telas():
@@ -251,11 +235,11 @@ def coletar_multiplas_telas():
     telas_sem_novidade = 0
     total_esperado = None
 
-    for rodada in range(1, MAX_ROLAGENS + 1):
-        print(f"\n--- Tela {rodada}/{MAX_ROLAGENS} ---", flush=True)
+    for rodada in range(1, MAX_SCROLLS + 1):
+        print(f"\n--- Tela {rodada}/{MAX_SCROLLS} ---", flush=True)
 
         capturar_xml()
-        textos = extrair_textos(XML_FILE)
+        textos = extrair_textos(TRACERS_WINDOW_DUMP_FILE)
 
         if total_esperado is None:
             total_esperado = extrair_total_casos(textos)
@@ -319,7 +303,7 @@ def coletar_multiplas_telas():
         else:
             telas_sem_novidade = 0
 
-        if telas_sem_novidade >= MAX_TELAS_SEM_NOVIDADE:
+        if telas_sem_novidade >= MAX_SCREENS_WITHOUT_NEW_ITEMS:
             print("\nNenhuma novidade por várias telas seguidas. Encerrando coleta.", flush=True)
             break
 
@@ -348,5 +332,5 @@ if __name__ == "__main__":
 
     print(f"\nTotal final de registros salvos no Excel: {len(registros)}", flush=True)
     print("Salvando Excel...", flush=True)
-    salvar_excel(registros, XLSX_FILE)
-    print(f"Arquivo salvo em: {XLSX_FILE}", flush=True)
+    salvar_excel(registros, TRACERS_EXCEL_FILE)
+    print(f"Arquivo salvo em: {TRACERS_EXCEL_FILE}", flush=True)
