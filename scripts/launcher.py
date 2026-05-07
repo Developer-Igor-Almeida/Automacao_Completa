@@ -1,27 +1,24 @@
+import os
 import subprocess
-import webbrowser
-import time
 import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-APP = BASE_DIR / "app.py"
 
-def iniciar_streamlit():
-    subprocess.Popen([
-        sys.executable,
-        "-m",
-        "streamlit",
-        "run",
-        str(APP),
-        "--server.headless=true",
-        "--server.port=8501"
-    ])
+def get_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
 
-def abrir_navegador():
-    time.sleep(3)
-    webbrowser.open("http://localhost:8501")
+    return Path(_file_).resolve().parents[1]
 
-if __name__ == "__main__":
-    iniciar_streamlit()
-    abrir_navegador()
+
+def main() -> None:
+    base_dir = get_base_dir()
+    app_path = base_dir / "app.py"
+
+    os.chdir(base_dir)
+
+    subprocess.run([sys.executable,"-m","streamlit","run",str(app_path),"--server.headless=true",])
+
+
+if _name_ == "_main_":
+    main()
