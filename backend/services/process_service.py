@@ -218,6 +218,7 @@ def _build_process_env() -> dict:
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
     env["PYTHONPATH"] = str(BASE_DIR)
+    env["NODE_NO_WARNINGS"] = "1"
 
     return env
 

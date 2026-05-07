@@ -89,7 +89,22 @@ def _render_technical_logs() -> None:
         fixed_log_text = _get_fixed_current_log_text()
 
         if fixed_log_text:
-            st.code(fixed_log_text[-8000:])
+            st.markdown(
+                f"""
+                <div style="
+                    max-height: 420px;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    background-color: #0e1117;
+                    padding: 16px;
+                    border-radius: 8px;
+                    font-family: monospace;
+                    white-space: pre;
+                    font-size: 14px;
+                ">{fixed_log_text}</div>
+                """,
+                unsafe_allow_html=True,
+            )
             return
 
         st.info("Nenhum log técnico disponível.")

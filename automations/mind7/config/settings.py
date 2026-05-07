@@ -21,9 +21,7 @@ CHROME_DEBUG_PORT = 9222
 POSSIBLE_CHROME_PATHS = [
     Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
     Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
-    Path(
-        rf"{Path.home()}\AppData\Local\Google\Chrome\Application\chrome.exe"
-    ),
+    Path(rf"{Path.home()}\AppData\Local\Google\Chrome\Application\chrome.exe"),
 ]
 
 
@@ -50,7 +48,7 @@ LONG_PAUSE_SECONDS = 60
 
 MAX_CAPTCHA_RETRIES = 5
 MAX_EXTRA_SUCCESS_RETRIES = 10
-CAPTCHA_WAIT_SECONDS = 60
+CAPTCHA_WAIT_SECONDS = 30
 
 
 # =========================================================
@@ -58,15 +56,22 @@ CAPTCHA_WAIT_SECONDS = 60
 # =========================================================
 
 DOCUMENT_INPUT_SELECTOR = "#documento"
-
 QUERY_BUTTON_TEXT = "Consultar"
-
 PAGE_LOAD_WAIT_SECONDS = 1.5
-
 TYPE_DELAY_MS = 120
-
 AFTER_TYPE_WAIT_SECONDS = 2.5
-
 RESULT_WAIT_TIMEOUT_SECONDS = 15
-
 RESULT_POLL_INTERVAL_SECONDS = 0.5
+
+# =========================================================
+# CHROME CONNECTION
+# =========================================================
+
+CDP_CONNECTION_URL = (
+    f"http://localhost:{CHROME_DEBUG_PORT}"
+)
+
+MIND7_DOMAIN = "mind-7.org"
+CHROME_PROFILE_DIR_NAME = "perfil_chrome"
+CONNECTION_RETRIES = 5
+CONNECTION_RETRY_WAIT_SECONDS = 2
