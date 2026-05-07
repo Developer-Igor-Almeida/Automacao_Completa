@@ -77,6 +77,5 @@ def create_required_directories():
     MIND7_INPUT_DIR.mkdir(parents=True, exist_ok=True)
     MIND7_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-
 def required_directories_exist():
     return TRACERS_DIR.exists() and MIND7_DIR.exists()

@@ -1,6 +1,5 @@
 """
 Gerenciamento de estado da aplicação.
-
 Responsável por:
 - inicializar session_state
 - controlar status da automação
@@ -9,14 +8,8 @@ Responsável por:
 """
 
 import streamlit as st
-
 from backend.constants.ui import STATUS_ICONS
-from backend.core.paths import (
-    TRACERS_EXCEL_FILE,
-    MIND7_INPUT_EXCEL_FILE,
-    FINAL_RESULT_FILE,
-)
-
+from backend.core.paths import (TRACERS_EXCEL_FILE,MIND7_INPUT_EXCEL_FILE,FINAL_RESULT_FILE,)
 
 INITIAL_SESSION_STATE = {
     "process": None,
@@ -37,7 +30,6 @@ INITIAL_SESSION_STATE = {
     "consultation_started": False,
 }
 
-
 FILE_STATE_SYNC_RULES = [
     {
         "file": TRACERS_EXCEL_FILE,
@@ -56,17 +48,22 @@ FILE_STATE_SYNC_RULES = [
     },
 ]
 
+STEP_STATE_PREFIXES = {
+    "tracers": "tracers",
+    "send": "send",
+    "chrome": "chrome",
+    "consultation": "consultation",
+}
+
 
 def initialize_session_state() -> None:
     for key, value in INITIAL_SESSION_STATE.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
-
 def is_process_running() -> bool:
     process = st.session_state.process
     return process is not None and process.poll() is None
-
 
 def get_status_icon(success: bool, error: bool) -> str:
     if success:
@@ -76,7 +73,6 @@ def get_status_icon(success: bool, error: bool) -> str:
         return STATUS_ICONS["error"]
 
     return STATUS_ICONS["pending"]
-
 
 def sync_state_with_existing_files() -> None:
     """
@@ -90,3 +86,15 @@ def sync_state_with_existing_files() -> None:
 
         if file_exists and not has_error:
             st.session_state[rule["completed_key"]] = True
+
+def set_step_status(step_name: str,completed: bool | None = None,error: bool | None = None,) -> None:
+    """
+    Atualiza os estados visuais de uma etapa.
+    """
+    prefix = STEP_STATE_PREFIXES[step_name]
+    
+    if completed is not None:
+        st.session_state[f"{prefix}_step_completed"] = completed
+
+    if error is not None:
+        st.session_state[f"{prefix}_step_error"] = error

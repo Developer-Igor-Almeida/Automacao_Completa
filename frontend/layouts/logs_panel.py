@@ -1,28 +1,47 @@
+"""
+Painel visual de progresso e logs da automação.
+
+Responsável por:
+- exibir progresso estimado
+- exibir mensagens amigáveis
+- exibir logs técnicos
+- permitir limpeza/atualização dos logs
+"""
+
 import streamlit as st
 
-from backend.core.logs import ler_log, limpar_logs, corrigir_acentos_log
-from backend.core.progress import calcular_progresso
-from backend.core.state import processo_rodando
-from backend.services.message_service import mensagem_amigavel_por_etapa
+from backend.core.logs import (clear_logs,fix_broken_text_encoding,read_log,)
+from backend.core.progress import calculate_progress
+from backend.core.state import is_process_running
+from backend.services.message_service import get_friendly_message_by_step
 
 
-def render_logs_panel():
+def render_logs_panel() -> None:
+    _render_progress()
+    _render_logs_actions()
+    _render_execution_status()
+    _render_technical_logs()
+
+    st.divider()
+
+def _render_progress() -> None:
     st.subheader("📊 Progresso em tempo real")
 
-    log_texto = ler_log(st.session_state.log_atual)
-    progresso = calcular_progresso(log_texto)
+    log_text = read_log(st.session_state.current_log_file)
+    progress = calculate_progress(log_text)
 
-    st.progress(progresso / 100)
-    st.write(f"Progresso estimado: **{progresso}%**")
+    st.progress(progress / 100)
+    st.write(f"Progresso estimado: **{progress}%**")
 
+def _render_logs_actions() -> None:
     st.subheader("📜 Logs organizados")
 
     col_log1, col_log2, _ = st.columns([1, 1, 4])
 
     with col_log1:
-        if st.button("🧹 Limpar logs", disabled=processo_rodando()):
-            limpar_logs()
-            st.session_state.log_atual = None
+        if st.button("🧹 Limpar logs", disabled=is_process_running()):
+            clear_logs()
+            st.session_state.current_log_file = None
             st.success("Logs limpos com sucesso!")
             st.rerun()
 
@@ -30,31 +49,32 @@ def render_logs_panel():
         if st.button("🔄 Atualizar logs"):
             st.rerun()
 
+def _render_execution_status() -> None:
     with st.expander("Status da execução", expanded=True):
-        log_texto_corrigido = corrigir_acentos_log(
-            ler_log(st.session_state.log_atual)
-        )
+        fixed_log_text = _get_fixed_current_log_text()
 
-        mensagem = mensagem_amigavel_por_etapa(
-            st.session_state.etapa,
-            log_texto_corrigido,
-        )
+        message = get_friendly_message_by_step(st.session_state.current_step,fixed_log_text,)
 
-        if mensagem:
-            st.info(mensagem)
-        elif log_texto_corrigido:
+        if message:
+            st.info(message)
+            return
+
+        if fixed_log_text:
             st.success("Processo em andamento ou finalizado sem erro crítico.")
-        else:
-            st.info("Nenhum processo iniciado ainda.")
+            return
 
+        st.info("Nenhum processo iniciado ainda.")
+
+def _render_technical_logs() -> None:
     with st.expander("Logs técnicos para suporte", expanded=False):
-        log_texto_corrigido = corrigir_acentos_log(
-            ler_log(st.session_state.log_atual)
-        )
+        fixed_log_text = _get_fixed_current_log_text()
 
-        if log_texto_corrigido:
-            st.code(log_texto_corrigido[-8000:])
-        else:
-            st.info("Nenhum log técnico disponível.")
+        if fixed_log_text:
+            st.code(fixed_log_text[-8000:])
+            return
 
-    st.divider()
+        st.info("Nenhum log técnico disponível.")
+
+def _get_fixed_current_log_text() -> str:
+    log_text = read_log(st.session_state.current_log_file)
+    return fix_broken_text_encoding(log_text)

@@ -9,7 +9,7 @@ from backend.constants.messages import (TRACERS_RUNTIME_ERROR_MESSAGE,TRACERS_FI
 MIND7_CAPTCHA_MESSAGE,MIND7_RUNNING_MESSAGE,MIND7_FINISHED_MESSAGE,
 MIND7_PREPARING_MESSAGE,FILE_PERMISSION_ERROR_MESSAGE,GENERIC_AUTOMATION_ERROR_MESSAGE,)
 from backend.constants.process import TRACERS_STEP_NAME, MIND7_STEP_NAME
-from backend.core.logs import corrigir_acentos_log
+from backend.core.logs import fix_broken_text_encoding
 from backend.services.process_service import detect_tracers_runtime_error
 
 MESSAGE_RULES_BY_STEP = {
@@ -32,7 +32,7 @@ GENERIC_MESSAGE_RULES = [
 ]
 
 def get_friendly_message_by_step(step_name: str, log_text: str) -> str:
-    normalized_text = corrigir_acentos_log(log_text).lower()
+    normalized_text = fix_broken_text_encoding(log_text).lower()
     if st.session_state.is_paused_by_error:
         return st.session_state.paused_error_message
 

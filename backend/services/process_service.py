@@ -21,7 +21,7 @@ import streamlit as st
 from backend.constants.errors import TRACERS_RUNTIME_ERRORS
 from backend.constants.messages import (PROCESS_START_ERROR_MESSAGE,TRACERS_DISCONNECTED_MESSAGE,TRACERS_FRIENDLY_LOG_MESSAGE,TRACERS_FRIENDLY_LOG_TITLE,)
 from backend.constants.process import (MIND7_STEP_NAME,MONITOR_CHECK_INTERVAL_SECONDS,MONITOR_INITIAL_DELAY_SECONDS,STEP_ERROR_STATE_KEYS,STREAMLIT_PORT,TRACERS_STEP_NAME,)
-from backend.core.logs import (corrigir_acentos_log,ler_log,)
+from backend.core.logs import (fix_broken_text_encoding, read_log,)
 from backend.core.paths import (FINAL_RESULT_FILE,TRACERS_EXCEL_FILE,TRACERS_LOG_FILE,)
 from backend.core.state import is_process_running
 
@@ -141,7 +141,7 @@ def detect_process_finished() -> None:
         return
 
     return_code = process.returncode
-    log_text = ler_log(st.session_state.current_log_file)
+    log_text = read_log(st.session_state.current_log_file)
 
     handler = PROCESS_FINISH_HANDLERS.get(current_step)
 
@@ -160,7 +160,7 @@ def monitor_realtime_errors() -> None:
     if st.session_state.current_step != TRACERS_STEP_NAME:
         return
 
-    log_text = ler_log(st.session_state.current_log_file)
+    log_text = read_log(st.session_state.current_log_file)
 
     if detect_tracers_runtime_error(log_text):
         pause_tracers_due_to_error()

@@ -1,7 +1,9 @@
 import streamlit as st
 
+from backend.constants.ui import APP_SUBTITLE, APP_TITLE
 
-def render_header():
+
+def render_header() -> None:
     st.markdown("""
     <style>
     .big-title {
@@ -18,13 +20,13 @@ def render_header():
     """, unsafe_allow_html=True)
 
     st.markdown(
-        '<div class="big-title">🚗 Automação Completa Tracers + Mind7</div>',
-        unsafe_allow_html=True
+        f'<div class="big-title">{APP_TITLE}</div>',
+        unsafe_allow_html=True,
     )
 
     st.markdown(
-        '<div class="subtitle">Fluxo automatizado: Tracers → Excel → Mind7 → CPF/CNPJ → Resultado Final</div>',
-        unsafe_allow_html=True
+        f'<div class="subtitle">{APP_SUBTITLE}</div>',
+        unsafe_allow_html=True,
     )
 
     st.divider()

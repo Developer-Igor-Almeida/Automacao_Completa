@@ -1,45 +1,37 @@
+"""
+Utilitários para leitura, limpeza e normalização de logs.
+
+Responsável por:
+- ler arquivos de log
+- limpar logs da aplicação
+- corrigir textos com encoding quebrado
+"""
+
+import logging
 from pathlib import Path
+from backend.constants.encoding import (BROKEN_TEXT_REPLACEMENTS,DEFAULT_ENCODING,)
+from backend.core.paths import (MIND7_LOG_FILE,TRACERS_LOG_FILE,)
 
-from backend.core.paths import LOG_TRACERS, LOG_MIND7
+logger = logging.getLogger(__name__)
 
-
-def ler_log(log_path):
+def read_log(log_path: Path | None) -> str:
     if not log_path or not Path(log_path).exists():
         return ""
 
-    return Path(log_path).read_text(encoding="utf-8", errors="ignore")
+    return Path(log_path).read_text(encoding=DEFAULT_ENCODING,errors="ignore",)
 
-
-def corrigir_acentos_log(texto):
-    if not texto:
+def fix_broken_text_encoding(text: str) -> str:
+    if not text:
         return ""
 
-    correcoes = {
-        "execuÃ§Ã£o": "execução",
-        "automaÃ§Ã£o": "automação",
-        "nÃ£o": "não",
-        "estÃ¡": "está",
-        "conexÃ£o": "conexão",
-        "informaÃ§Ãµes": "informações",
-        "veÃ­culo": "veículo",
-        "prÃ³xima": "próxima",
-        "validaÃ§Ã£o": "validação",
-        "possÃ­vel": "possível",
-        "cÃ³digo": "código",
-        "usuÃ¡rio": "usuário",
-        "aplicaÃ§Ã£o": "aplicação",
-        "extraÃ§Ã£o": "extração",
-    }
+    for broken_text, fixed_text in BROKEN_TEXT_REPLACEMENTS.items():
+        text = text.replace(broken_text, fixed_text)
 
-    for errado, certo in correcoes.items():
-        texto = texto.replace(errado, certo)
+    return text
 
-    return texto
-
-
-def limpar_logs():
-    for log_file in [LOG_TRACERS, LOG_MIND7]:
+def clear_logs() -> None:
+    for log_file in [TRACERS_LOG_FILE, MIND7_LOG_FILE]:
         try:
-            log_file.write_text("", encoding="utf-8")
+            log_file.write_text("", encoding=DEFAULT_ENCODING)
         except Exception:
-            pass
+            logger.exception("Erro ao limpar arquivo de log: %s", log_file)

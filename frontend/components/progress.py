@@ -1,14 +1,20 @@
 import streamlit as st
 
-from backend.core.logs import ler_log
-from backend.core.progress import calcular_progresso
-from backend.core.state import processo_rodando
+from backend.constants.ui import STEP_PROGRESS_CAPTION
+from backend.core.logs import read_log
+from backend.core.progress import calculate_progress
+from backend.core.state import is_process_running
 
 
-def mostrar_progresso_etapa(nome_etapa):
-    if processo_rodando() and st.session_state.etapa == nome_etapa:
-        log_texto = ler_log(st.session_state.log_atual)
-        progresso = calcular_progresso(log_texto)
+def render_step_progress(step_name: str) -> None:
+    if not is_process_running():
+        return
 
-        st.progress(progresso / 100)
-        st.caption(f"Executando... {progresso}%")
+    if st.session_state.current_step != step_name:
+        return
+
+    log_text = read_log(st.session_state.current_log_file)
+    progress = calculate_progress(log_text)
+
+    st.progress(progress / 100)
+    st.caption(STEP_PROGRESS_CAPTION.format(progress=progress))

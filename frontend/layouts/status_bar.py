@@ -1,21 +1,21 @@
 import streamlit as st
 
-from backend.core.state import processo_rodando
-from backend.services.process_service import parar_processo
+from backend.constants.ui import (AUTOMATION_INTERRUPTED_MESSAGE, NO_AUTOMATION_RUNNING_MESSAGE, PROCESS_RUNNING_MESSAGE, STOP_AUTOMATION_BUTTON_LABEL,)
+from backend.core.state import is_process_running
+from backend.services.process_service import stop_process
 
+def render_status_bar() -> None:
+    if is_process_running():
+        st.warning(PROCESS_RUNNING_MESSAGE.format(step=st.session_state.current_step,))
 
-def render_status_bar():
-    if processo_rodando():
-        st.warning(f"Processo em execução: {st.session_state.etapa}")
-
-        if st.button("🛑 PARAR AUTOMAÇÃO", type="primary"):
-            parar_processo()
-            st.error("Automação interrompida.")
+        if st.button(STOP_AUTOMATION_BUTTON_LABEL, type="primary"):
+            stop_process()
+            st.error(AUTOMATION_INTERRUPTED_MESSAGE)
             st.rerun()
     else:
-        st.success("Nenhuma automação em execução no momento.")
+        st.success(NO_AUTOMATION_RUNNING_MESSAGE)
 
-    if st.session_state.erro_pausado:
-        st.error(st.session_state.mensagem_erro_pausado)
+    if st.session_state.is_paused_by_error:
+        st.error(st.session_state.paused_error_message)
 
     st.divider()
