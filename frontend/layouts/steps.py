@@ -232,14 +232,19 @@ def _render_send_to_mind7_step() -> None:
             copy_file(TRACERS_EXCEL_FILE, MIND7_INPUT_EXCEL_FILE)
 
             set_step_status("send", completed=True, error=False)
-            _render_success("Arquivo copiado para entrada do Mind7.")
+
+            st.session_state.send_success_message = (
+                "Arquivo copiado para o Mind7 ✅"
+            )
 
             st.rerun()
 
         except Exception as error:
             set_step_status("send", completed=False, error=True)
             _render_error(f"Erro ao copiar arquivo: {error}")
-
+    if st.session_state.get("send_success_message"):
+        st.success(st.session_state.send_success_message)
+        st.session_state.send_success_message = ""
 
 def _render_chrome_step() -> None:
     """Etapa 3: Abrir Chrome Mind7."""

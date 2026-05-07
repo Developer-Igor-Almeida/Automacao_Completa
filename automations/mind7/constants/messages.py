@@ -29,3 +29,7 @@ BLANK_FOR_NEXT_RUN_MESSAGE = ("Elas ficarão em branco para próxima execução.
 
 MIND7_VALIDATION_WAIT_MESSAGE = ("Mind7 solicitou validação. ""Aguardando liberação...")
 DOCUMENT_NOT_FOUND_RETRY_MESSAGE = ("Documento não encontrado para {plate}. " "Será tentado novamente.")
+CAPTCHA_DETECTED_WAIT_MESSAGE = ("CAPTCHA detectado. Aguardando {seconds}s antes de continuar...")
+WAITING_CLOUDFLARE_MESSAGE = (
+    "Aguardando validação do Cloudflare antes de consultar..."
+)

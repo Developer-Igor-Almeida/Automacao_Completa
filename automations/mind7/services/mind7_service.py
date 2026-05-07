@@ -7,23 +7,24 @@ import time
 
 from automations.mind7.config.settings import (AFTER_TYPE_WAIT_SECONDS, DOCUMENT_INPUT_SELECTOR, MIND7_URL,
   PAGE_LOAD_WAIT_SECONDS,QUERY_BUTTON_TEXT,RESULT_POLL_INTERVAL_SECONDS,
-  RESULT_WAIT_TIMEOUT_SECONDS,TYPE_DELAY_MS,
+  RESULT_WAIT_TIMEOUT_SECONDS,TYPE_DELAY_MS,CLOUDFLARE_SUCCESS_WAIT_SECONDS, CLOUDFLARE_POLL_INTERVAL_SECONDS
 )
 
 from automations.mind7.constants.query import (CAPTCHA_ERROR_MESSAGES,CAPTCHA_RESULT,OWNER_SECTION_KEYWORD,)
-from automations.mind7.constants.messages import (MIND7_VALIDATION_WAIT_MESSAGE)
+from automations.mind7.constants.messages import (MIND7_VALIDATION_WAIT_MESSAGE, WAITING_CLOUDFLARE_MESSAGE)
 
 from automations.mind7.services.document_service import (extract_document_from_text,)
 
 def query_plate(page, plate: str) -> str:
     _open_query_page(page)
 
-    wait_until_page_is_ready(page)
+    _fill_plate_input(page=page,plate=plate,)
 
-    _fill_plate_input(page=page, plate=plate)
+    _wait_cloudflare_success(page)
+
     _click_query_button(page)
 
-    return _wait_for_query_result(page=page, plate=plate)
+    return _wait_for_query_result(page=page,plate=plate,)
 
 
 def _open_query_page(page) -> None:
@@ -96,6 +97,7 @@ def _has_captcha_error(text: str,) -> bool:
     return any(message in text for message in CAPTCHA_ERROR_MESSAGES)
 
 def wait_until_page_is_ready(page) -> None:
+    
     start_time = time.time()
 
     while time.time() - start_time < 60:
@@ -108,3 +110,16 @@ def wait_until_page_is_ready(page) -> None:
         print(MIND7_VALIDATION_WAIT_MESSAGE,flush=True,)
 
         time.sleep(5)
+
+def _wait_cloudflare_success(page) -> None:
+    print(WAITING_CLOUDFLARE_MESSAGE, flush=True)
+
+    start_time = time.time()
+
+    while time.time() - start_time < CLOUDFLARE_SUCCESS_WAIT_SECONDS:
+        body_text = page.locator("body").inner_text(timeout=5000).lower()
+
+        if "sucesso" in body_text:
+            return
+
+        time.sleep(CLOUDFLARE_POLL_INTERVAL_SECONDS)
