@@ -6,7 +6,7 @@ SUCCESS_ICON = " ✅"
 ERROR_ICON = " ❌"
 PENDING_ICON = ""
 
-APP_TITLE = "🚗 Automação Completa Tracers + Mind7"
+APP_TITLE = "🚗 Automação Tracers + Mind7"
 APP_SUBTITLE = "Fluxo automatizado: Tracers → Excel → Mind7 → CPF/CNPJ → Resultado Final"
 
 METRIC_TRACERS_FILE_LABEL = "Arquivo Tracers"
