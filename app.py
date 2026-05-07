@@ -41,7 +41,7 @@ def validate_project_structure() -> None:
 def main() -> None:
     validate_project_structure()
     initialize_session_state()
-    start_connection_monitor()
+    #start_connection_monitor()
     sync_state_with_existing_files()
     detect_process_finished()
     monitor_realtime_errors()

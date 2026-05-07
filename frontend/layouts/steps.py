@@ -12,16 +12,33 @@ from pathlib import Path
 
 import streamlit as st
 
-from backend.constants.process import TRACERS_STEP_NAME, MIND7_STEP_NAME
-from backend.core.paths import (TRACERS_DIR,MIND7_DIR,TRACERS_LOG_FILE,MIND7_LOG_FILE,TRACERS_EXCEL_FILE,MIND7_INPUT_EXCEL_FILE,TRACERS_SCRIPT,MIND7_SCRIPT,MIND7_CHROME_BAT,)
-from backend.constants.messages import (OPEN_CHROME_BUTTON_LABEL,SEND_TO_MIND7_BUTTON_LABEL,START_MIND7_CONSULTATION_BUTTON_LABEL,TRACERS_START_BUTTON_LABEL,)
-from backend.core.state import (is_process_running,get_status_icon,set_step_status,)
-from backend.core.paths import (TRACERS_DIR,MIND7_DIR,TRACERS_LOG_FILE, MIND7_LOG_FILE,TRACERS_EXCEL_FILE, BASE_DIR,
- MIND7_INPUT_EXCEL_FILE,TRACERS_SCRIPT,MIND7_SCRIPT,MIND7_CHROME_BAT,)
-from backend.core.state import (get_status_icon,is_process_running,set_step_status,)
-from backend.services.process_service import start_process
+from automations.mind7.services.chrome_service import open_mind7_chrome
+from backend.constants.messages import (
+    OPEN_CHROME_BUTTON_LABEL,
+    SEND_TO_MIND7_BUTTON_LABEL,
+    START_MIND7_CONSULTATION_BUTTON_LABEL,
+    TRACERS_START_BUTTON_LABEL,
+)
+from backend.constants.process import (
+    MIND7_STEP_NAME,
+    TRACERS_STEP_NAME,
+)
+from backend.core.paths import (
+    BASE_DIR,
+    MIND7_INPUT_EXCEL_FILE,
+    MIND7_LOG_FILE,
+    MIND7_SCRIPT,
+    TRACERS_EXCEL_FILE,
+    TRACERS_LOG_FILE,
+    TRACERS_SCRIPT,
+)
+from backend.core.state import (
+    get_status_icon,
+    is_process_running,
+    set_step_status,
+)
 from backend.services.file_service import copy_file
-from backend.services.chrome_service import open_chrome_bat
+from backend.services.process_service import start_process
 
 
 def render_steps() -> None:
@@ -151,13 +168,13 @@ def _render_continue_after_error() -> None:
 
         start_process(
             [sys.executable, "-u", str(TRACERS_SCRIPT)],
-            TRACERS_DIR,
+            BASE_DIR,
             TRACERS_LOG_FILE,
             TRACERS_STEP_NAME,
         )
 
-        start_process([sys.executable, "-u", str(TRACERS_SCRIPT)],BASE_DIR,TRACERS_LOG_FILE,TRACERS_STEP_NAME,)
         st.rerun()
+
 
 def _render_tracers_step() -> None:
     """Etapa 1: Extrair placas do Tracers."""
@@ -184,12 +201,13 @@ def _render_tracers_step() -> None:
 
         start_process(
             [sys.executable, "-u", str(TRACERS_SCRIPT)],
-            TRACERS_DIR,
+            BASE_DIR,
             TRACERS_LOG_FILE,
             TRACERS_STEP_NAME,
         )
 
         st.rerun()
+
 
 def _render_send_to_mind7_step() -> None:
     """Etapa 2: Enviar Excel para Mind7."""
@@ -237,15 +255,9 @@ def _render_chrome_step() -> None:
         _render_hint("Conclua a etapa 2 primeiro")
         return
 
-    if not _file_exists_or_show_error(
-        MIND7_CHROME_BAT,
-        "Arquivo abrir_chrome_mind7.bat",
-    ):
-        return
-
     if st.button(button_text, disabled=is_process_running()):
         try:
-            open_chrome_bat(MIND7_CHROME_BAT, MIND7_DIR)
+            open_mind7_chrome()
 
             set_step_status("chrome", completed=True, error=False)
             _render_success("Chrome aberto. Faça login no Mind7.")
@@ -287,7 +299,7 @@ def _render_mind7_consultation_step() -> None:
 
         start_process(
             [sys.executable, "-u", str(MIND7_SCRIPT)],
-            MIND7_DIR,
+            BASE_DIR,
             MIND7_LOG_FILE,
             MIND7_STEP_NAME,
         )
