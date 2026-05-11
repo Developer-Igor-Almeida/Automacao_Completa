@@ -1,8 +1,14 @@
 @echo off
-title Automacao Completa
+setlocal
 
-cd /d "%~dp0\.."
+cd /d "%~dp0.."
 
-py scripts\launcher.py
+start "" http://localhost:8501
 
-exit
+python -m streamlit run app.py ^
+  --server.port 8501 ^
+  --server.address localhost ^
+  --server.headless true ^
+  --server.fileWatcherType none ^
+  --browser.gatherUsageStats false ^
+  --global.developmentMode false

@@ -1,24 +1,38 @@
-import os
 import subprocess
 import sys
+import time
+import webbrowser
 from pathlib import Path
 
+if getattr(sys, "frozen", False):
+    exe_dir = Path(sys.executable).resolve().parent
 
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
+    if (exe_dir / "app.py").exists():
+        base_dir = exe_dir
+    else:
+        base_dir = exe_dir.parent
+else:
+    base_dir = Path(__file__).resolve().parents[1]
 
-    return Path(_file_).resolve().parents[1]
+app_path = base_dir / "app.py"
+python_exe = base_dir / "python" / "python.exe"
 
+subprocess.Popen(
+    [
+        str(python_exe),
+        "-m",
+        "streamlit",
+        "run",
+        str(app_path),
+        "--server.port", "8501",
+        "--server.address", "localhost",
+        "--server.headless", "true",
+        "--server.fileWatcherType", "none",
+        "--browser.gatherUsageStats", "false",
+        "--global.developmentMode", "false",
+    ],
+    cwd=base_dir,
+)
 
-def main() -> None:
-    base_dir = get_base_dir()
-    app_path = base_dir / "app.py"
-
-    os.chdir(base_dir)
-
-    subprocess.run([sys.executable,"-m","streamlit","run",str(app_path),"--server.headless=true",])
-
-
-if _name_ == "_main_":
-    main()
+time.sleep(5)
+webbrowser.open("http://localhost:8501")
