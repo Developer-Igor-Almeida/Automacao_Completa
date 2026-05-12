@@ -9,7 +9,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # ─── Checkout do código ────────────────────────────
+      # ─── Checkout ─────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -31,6 +31,12 @@ jobs:
       # ─── PyInstaller ──────────────────────────────────
       - name: Gera o EXE
         run: pyinstaller AbrirAutomacaoTracersMind7.spec
+
+      # ─── Baixa o Python installer automaticamente ─────
+      - name: Baixa Python 3.11 installer
+        run: |
+          curl -L -o installers/python-installer.exe `
+            https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
 
       # ─── Inno Setup ───────────────────────────────────
       - name: Instala Inno Setup

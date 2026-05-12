@@ -11,7 +11,8 @@ installer_dist/
 # INSTALLERS GERADOS
 # =====================================================
 
-installers/
+installers/*
+!installers/.gitkeep
 
 *.spec
 !AbrirAutomacaoTracersMind7.spec    ← adiciona essa linha
