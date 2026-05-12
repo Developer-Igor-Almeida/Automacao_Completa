@@ -13,6 +13,9 @@ installer_dist/
 
 installers/
 
+*.spec
+!AbrirAutomacaoTracersMind7.spec    ← adiciona essa linha
+
 
 # =====================================================
 # PYTHON

@@ -1,0 +1,56 @@
+name: Build EXE + Instalador
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # ─── Checkout do código ────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ─── Python ───────────────────────────────────────
+      - name: Configura Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ─── Dependências ─────────────────────────────────
+      - name: Instala dependências
+        run: pip install -r requirements.txt
+
+      # ─── Playwright ───────────────────────────────────
+      - name: Instala browsers do Playwright
+        run: playwright install chromium
+
+      # ─── PyInstaller ──────────────────────────────────
+      - name: Gera o EXE
+        run: pyinstaller AbrirAutomacaoTracersMind7.spec
+
+      # ─── Inno Setup ───────────────────────────────────
+      - name: Instala Inno Setup
+        run: choco install innosetup --yes
+
+      - name: Gera o instalador .exe
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      # ─── Upload dos artefatos ─────────────────────────
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: exe-build
+          path: dist/
+          retention-days: 7
+
+      - name: Upload Instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: instalador
+          path: installer_dist/
+          retention-days: 7
