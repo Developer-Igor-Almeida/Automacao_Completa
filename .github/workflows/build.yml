@@ -30,7 +30,7 @@ jobs:
 
       # ─── PyInstaller ──────────────────────────────────
       - name: Gera o EXE
-        run: pyinstaller AbrirAutomacaoTracersMind7.spec
+        run: python -m PyInstaller AbrirAutomacaoTracersMind7.spec
 
       # ─── Baixa o Python installer automaticamente ─────
       - name: Baixa Python 3.11 installer
